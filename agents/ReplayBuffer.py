@@ -9,8 +9,9 @@ class ReplayBuffer():
 
     self.states = np.empty((self.size, state_dim))
     self.actions = np.empty((self.size, action_dim))
-    self.rewards = np.empty((self.size, 1))
+    self.rewards = np.empty(self.size)
     self.next_states = np.empty((self.size, state_dim))
+    self.done = np.empty(self.size)
 
   def add(self, item):
 
@@ -18,6 +19,7 @@ class ReplayBuffer():
     self.actions[self.next_idx] = item["action"]
     self.rewards[self.next_idx] = item["reward"]
     self.next_states[self.next_idx] = item["next_state"]
+    self.done[self.next_idx] = item["done"]
 
     if self.next_idx == self.size - 1:
       self.full = True
@@ -34,8 +36,9 @@ class ReplayBuffer():
     return {
       "states": self.states[idxs, :],
       "actions": self.actions[idxs, :],
-      "rewards": self.rewards[idxs, :],
-      "next_states": self.next_states[idxs, :]
+      "rewards": self.rewards[idxs],
+      "next_states": self.next_states[idxs, :],
+      "done": self.done[idxs]
     }
 
   def get_size(self):
