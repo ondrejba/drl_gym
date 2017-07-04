@@ -151,6 +151,7 @@ class DeepQNetwork():
 
       tmp_state = state
       state, reward, done, info = env.step(action)
+
       total_reward += reward
 
       self.buffer.add({
@@ -188,7 +189,7 @@ class DeepQNetwork():
     summary_2 = summary_pb2.Summary(value=[summary_value])
     self.summary_writer.add_summary(summary_2, global_step=self.step)
 
-    if total_reward == self.max_reward:
+    if total_reward >= self.max_reward:
       self.solved = True
     else:
       self.solved = False
