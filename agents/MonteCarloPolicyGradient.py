@@ -4,7 +4,7 @@ import math, os
 
 import utils.utils as utils
 
-class MonteCarloPolicyGradient():
+class MonteCarloPolicyGradient:
 
   def __init__(self, state_dim, action_dim, name, discount=0.9):
     self.state_dim = state_dim

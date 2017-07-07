@@ -1,6 +1,6 @@
 import numpy as np
 
-class ReplayBuffer():
+class ReplayBuffer:
 
   def __init__(self, size, state_dim, action_dim):
     self.size = size

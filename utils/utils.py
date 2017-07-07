@@ -1,9 +1,19 @@
+import os
 import numpy as np
 
 def sample(probs):
   return np.random.choice(len(probs), None, p=probs)
 
-class MonitorCallable():
+def new_summary_dir(summary_dir):
+  i = 1
+  while os.path.isdir(os.path.join(summary_dir, "run{}".format(i))):
+    i += 1
+
+  summary_dir = os.path.join(summary_dir, "run{}".format(i))
+  os.mkdir(summary_dir)
+  return summary_dir
+
+class MonitorCallable:
 
   def __init__(self, video_ep_freq=100):
     self.video_ep_freq = video_ep_freq
@@ -14,7 +24,7 @@ class MonitorCallable():
     else:
       return (idx != 0) and (idx % self.video_ep_freq == 0)
 
-class Timer(object):
+class Timer:
 
   def __init__(self):
     self.times = {}

@@ -37,7 +37,7 @@ def huber_loss(x, delta=1.0):
     delta * (tf.abs(x) - 0.5 * delta)
   )
 
-class NeuralNetwork():
+class NeuralNetwork:
 
   class Type(Enum):
     MLP = 1

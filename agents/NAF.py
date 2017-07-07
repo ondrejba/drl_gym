@@ -1,21 +1,35 @@
 import tensorflow as tf
+from tensorflow.core.framework import summary_pb2
 
 import utils.architect as architect
+from utils.ReplayBuffer import ReplayBuffer
+import utils.utils as utils
 
-class NAF():
+class NAF:
 
   MODEL_NAME = "NAF"
   TARGET_MODEL_NAME = "target-NAF"
 
-  def __init__(self, state_dim, action_dim, detailed_summary=False):
+  def __init__(self, prep, state_dim, action_dim, buffer_size=10000, batch_size=32, steps_before_train=10000,
+               train_freq=1, max_iters=1000000, max_reward=None, detailed_summary=False):
 
+    self.prep = prep
     self.state_dim = state_dim
     self.action_dim = action_dim
     self.detailed_summary = detailed_summary
 
-    self.discount = 0.9
-    self.learning_rate = 1e-04
-    self.target_update_rate = 1e-2
+    self.discount = 0.99
+    self.learning_rate = 1e-4
+    self.target_update_rate = 1e-3
+    self.buffer_size = buffer_size
+    self.batch_size = batch_size
+    self.steps_before_train = steps_before_train
+    self.train_freq = train_freq
+    self.max_reward = max_reward
+    self.max_iters = max_iters
+
+    self.step = 0
+    self.solved = False
 
     self.state_layers = [
       64, 32
@@ -36,9 +50,46 @@ class NAF():
       1
     ]
 
+    self.action_inputs = None
+    self.reward_inputs = None
+    self.done = None
+    self.state_inputs = None
+    self.state_outputs = None
+    self.mu_outputs = None
+    self.l_outputs = None
+    self.value_outputs = None
+    self.next_state_inputs = None
+    self.next_state_outputs = None
+    self.target_value_outputs = None
+    self.target = None
+    self.advantages = None
+    self.q_values = None
+    self.loss = None
+    self.global_step = None
+    self.inc_global_step = None
+    self.train_op = None
+    self.target_update = None
+
+    self.buffer = ReplayBuffer(buffer_size, self.state_dim, self.action_dim)
+
+    self.build()
+
+    self.merged = tf.summary.merge_all()
+
+    self.session = tf.Session()
+
+    self.summary_dir = utils.new_summary_dir(self.summary_dir)
+    self.summary_writer = tf.summary.FileWriter(self.summary_dir, self.session.graph)
+
+    self.saver = tf.train.Saver(max_to_keep=None)
+
+    init_op = tf.global_variables_initializer()
+    self.session.run(init_op)
+
   def build(self):
     self.action_inputs = tf.placeholder(tf.float32, (None, self.action_dim))
     self.reward_inputs = tf.placeholder(tf.float32, (None, 1))
+    self.done = tf.placeholder(tf.float32, (None, 1))
 
     self.state_inputs, self.state_outputs, self.mu_outputs, self.l_outputs, self.value_outputs = \
       self.build_network(self.MODEL_NAME)
@@ -46,7 +97,7 @@ class NAF():
     self.next_state_inputs, self.next_state_outputs, _, _, self.target_value_outputs = \
       self.build_network(self.TARGET_MODEL_NAME)
 
-    self.target = self.reward_inputs + self.discount * self.target_value_outputs
+    self.target = self.reward_inputs + (1 - self.done) * self.discount * self.target_value_outputs
 
     # taken from https://github.com/carpedm20/NAF-tensorflow/blob/master/src/network.py
     pivot = 0
@@ -73,6 +124,9 @@ class NAF():
     self.loss = tf.reduce_mean(architect.huber_loss(self.q_values - tf.stop_gradient(self.target)))
 
     tf.summary.scalar("training_loss", self.loss)
+
+    self.global_step = tf.Variable(0, name='global_step', trainable=False)
+    self.inc_global_step = tf.assign(self.global_step, tf.add(self.global_step, 1))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
     self.train_op = optimizer.minimize(self.loss)
@@ -108,3 +162,78 @@ class NAF():
       self.target_update.append(update_op)
 
     self.target_update = tf.group(*self.target_update)
+
+  def learn(self):
+    # learn
+    batch = self.buffer.sample(self.batch_size)
+
+    merged, _ = self.session.run([self.merged, self.train_op], feed_dict={
+      self.state_inputs: batch["states"],
+      self.action_inputs: batch["actions"],
+      self.reward_inputs: batch["rewards"],
+      self.next_state_inputs: batch["next_states"],
+      self.done: batch["done"]
+    })
+
+    self.summary_writer.add_summary(merged, global_step=self.step)
+
+    # target update
+    self.session.run(self.target_update)
+
+  def run_episode(self, env):
+
+    state = env.reset()
+    state, skip = self.prep.process(state)
+
+    total_reward = 0
+
+    while True:
+      # play
+      if skip:
+        action = env.action_space.sample()
+      else:
+        action = self.mu_outputs
+
+      tmp_state = state
+      tmp_skip = skip
+
+      state, reward, done, info = env.step(action)
+      state, skip = self.prep.process(state)
+
+      total_reward += reward
+
+      if not tmp_skip and not tmp_skip:
+        self.buffer.add({
+            "state": tmp_state[0],
+            "action": action,
+            "reward": reward,
+            "next_state": state[0],
+            "done": int(done)
+          })
+
+      if self.step >= self.steps_before_train and self.step % self.train_freq == 0 and not self.solved:
+        # learn
+        self.learn()
+
+      _, self.step = self.session.run([self.inc_global_step, self.global_step])
+
+      if done:
+        break
+
+    summary_value = summary_pb2.Summary.Value(tag="episode_reward", simple_value=total_reward)
+    summary_2 = summary_pb2.Summary(value=[summary_value])
+    self.summary_writer.add_summary(summary_2, global_step=self.step)
+
+    if self.max_reward is not None:
+      if total_reward >= self.max_reward:
+        self.solved = True
+      else:
+        self.solved = False
+
+    if self.step == self.max_iters:
+      self.saver.save(self.session, self.summary_dir, global_step=self.step)
+
+    return total_reward, self.step
+
+  def close(self):
+    self.session.close()

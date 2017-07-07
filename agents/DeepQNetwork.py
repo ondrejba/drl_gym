@@ -7,6 +7,7 @@ import utils.policy as policy
 import utils.architect as architect
 from utils.ReplayBuffer import ReplayBuffer
 from utils.Prep import Prep
+import utils.utils as utils
 
 class DeepQNetwork:
 
@@ -63,7 +64,7 @@ class DeepQNetwork:
 
     self.session = tf.Session()
 
-    self.new_summary_dir()
+    self.summary_dir = utils.new_summary_dir(self.summary_dir)
     self.summary_writer = tf.summary.FileWriter(self.summary_dir, self.session.graph)
 
     self.saver = tf.train.Saver(max_to_keep=None)
@@ -106,7 +107,7 @@ class DeepQNetwork:
 
     self.global_step = tf.Variable(0, name='global_step', trainable=False)
     self.inc_global_step = tf.assign(self.global_step, tf.add(self.global_step, 1))
-    self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss, global_step=self.global_step)
+    self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
 
   def build_network(self):
     self.states, self.q_values = self.network.build(self.state_dim, self.action_dim, self.ACTION_VALUE_NET_NAME)
@@ -142,7 +143,7 @@ class DeepQNetwork:
     # learn
     batch = self.buffer.sample(self.batch_size)
 
-    merged, self.step, _ = self.session.run([self.merged, self.global_step, self.train_op], feed_dict={
+    merged, _ = self.session.run([self.merged, self.train_op], feed_dict={
       self.states: batch["states"],
       self.actions: batch["actions"],
       self.rewards: batch["rewards"],
@@ -205,12 +206,11 @@ class DeepQNetwork:
             "done": int(done)
           })
 
-      if self.step >= self.steps_before_learn and not self.solved:
+      if self.step >= self.steps_before_learn and self.step % self.train_freq == 0 and not self.solved:
         # learn
-        if self.step % self.train_freq == 0:
-          self.learn()
-      else:
-        _, self.step = self.session.run([self.inc_global_step, self.global_step])
+        self.learn()
+
+      _, self.step = self.session.run([self.inc_global_step, self.global_step])
 
       if done:
         break
@@ -231,11 +231,3 @@ class DeepQNetwork:
 
   def close(self):
     self.session.close()
-
-  def new_summary_dir(self):
-    i = 1
-    while os.path.isdir(os.path.join(self.summary_dir, "run{}".format(i))):
-      i += 1
-
-    self.summary_dir = os.path.join(self.summary_dir, "run{}".format(i))
-    os.mkdir(self.summary_dir)
