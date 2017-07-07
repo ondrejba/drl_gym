@@ -9,7 +9,10 @@ class MonitorCallable():
     self.video_ep_freq = video_ep_freq
 
   def call(self, idx):
-    return (idx != 0) and (idx % self.video_ep_freq == 0)
+    if self.video_ep_freq == 0:
+      return False
+    else:
+      return (idx != 0) and (idx % self.video_ep_freq == 0)
 
 class Timer(object):
 

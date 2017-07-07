@@ -56,5 +56,22 @@ class NeuralNetwork():
           output_layer = dense_block(input_layer, [*self.config["hidden"], output_dim], "dense", batch_norm_phase=self.config["batch_norm"])
           return input_layer, output_layer
       elif self.type == self.Type.CNN_MLP:
-        input_layer = tf.placeholder(tf.float32, shape=(None, input_dim[0], input_dim[1]))
+        input_layer = tf.placeholder(tf.float32, shape=(None, *input_dim))
 
+        output = input_layer
+
+        if self.config["pool"] is None:
+          iter = zip(self.config["conv"], [None] * len(self.config["conv"]))
+        else:
+          iter = zip(self.config["conv"], self.config["pool"])
+
+        for conv_config in iter:
+          output = tf.layers.conv2d(output, conv_config[0]["num_maps"], conv_config[0]["filter_shape"], strides=conv_config[0]["stride"], padding="same", activation=tf.nn.relu)
+
+          if conv_config[1] is not None:
+            output = tf.layers.max_pooling2d(output, conv_config[1]["shape"], conv_config[1]["stride"])
+
+        output = tf.reshape(output, [-1, output.get_shape()[1].value * output.get_shape()[2].value * output.get_shape()[3].value])
+
+        output_layer = dense_block(output, [*self.config["hidden"], output_dim], "dense")
+        return input_layer, output_layer

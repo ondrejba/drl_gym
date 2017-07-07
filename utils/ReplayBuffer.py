@@ -7,10 +7,10 @@ class ReplayBuffer():
     self.next_idx = 0
     self.full = False
 
-    self.states = np.empty((self.size, state_dim))
+    self.states = np.empty((self.size, *state_dim))
     self.actions = np.empty((self.size, action_dim))
     self.rewards = np.empty(self.size)
-    self.next_states = np.empty((self.size, state_dim))
+    self.next_states = np.empty((self.size, *state_dim))
     self.done = np.empty(self.size)
 
   def add(self, item):

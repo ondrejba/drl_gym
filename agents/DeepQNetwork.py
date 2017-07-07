@@ -15,7 +15,7 @@ class DeepQNetwork:
 
   def __init__(self, network, prep, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
                buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None,
-               max_iters=200000, discount=0.9, use_huber_loss=True, detailed_summary=False, max_reward=200):
+               max_iters=200000, discount=0.99, use_huber_loss=True, detailed_summary=False, max_reward=200):
 
     self.network = network
     self.prep = prep
@@ -162,11 +162,11 @@ class DeepQNetwork:
 
     while True:
       # play
-      q_values = self.session.run(self.q_values, feed_dict={self.states: state})[0]
-
       if skip:
         action = env.action_space.sample()
       else:
+        q_values = self.session.run(self.q_values, feed_dict={self.states: state})[0]
+
         if self.lin_exp_end_iter:
           if self.lin_exp_final_eps is None:
             fin_eps = 0

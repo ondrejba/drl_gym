@@ -1,32 +1,85 @@
-import gym
-import matplotlib.pyplot as plt
+import gym, argparse
 
-from utils.Prep import Player
+from agents.DeepQNetwork import DeepQNetwork
+from utils.Prep import Prep
+from utils.architect import NeuralNetwork
+import utils.utils as utils
+import utils.config as config
 
-ALG_NAME = "deep-q-network"
+ALG_NAME = "data/deep-q-network"
 
-env = gym.make("Breakout-v0")
-env = gym.wrappers.Monitor(env, ALG_NAME, force=True)
+def main(args):
+  env = gym.make("Breakout-v0")
 
-player = Player(Player.Type.ATARI)
+  if not args.disable_monitor:
+    monitor_callable = utils.MonitorCallable(args.monitor_frequency)
+    env = gym.wrappers.Monitor(env, ALG_NAME, force=True, video_callable=monitor_callable.call)
 
-while True:
-  obs, done = env.reset(), False
-  episode_rew = 0
+  prep = Prep(Prep.Type.ATARI)
 
-  while not done:
-    env.render()
-    state, reward, done, _ = env.step(env.action_space.sample())
+  nn = NeuralNetwork({
+    "conv": [
+      {
+        "num_maps": 32,
+        "filter_shape": (8, 8),
+        "stride": (4, 4)
+      },
+      {
+        "num_maps": 64,
+        "filter_shape": (4, 4),
+        "stride": (2, 2)
+      },
+      {
+        "num_maps": 64,
+        "filter_shape": (3, 3),
+        "stride": (1, 1)
+      }
+    ],
+    "pool": None,
+    "hidden": [
+      512
+    ]
+  }, NeuralNetwork.Type.CNN_MLP)
+  dqn = DeepQNetwork(nn, prep, (Prep.ATARI_WIDTH, Prep.ATARI_HEIGHT, 4), 4, ALG_NAME,
+                     buffer_size=args.buffer_size, hard_update_frequency=args.hard_update_frequency,
+                     soft_update_rate=args.soft_update_rate, max_iters=args.num_steps,
+                     lin_exp_end_iter=0.3, lin_exp_final_eps=0.1)
 
-    x = player.process(obs)
+  total_score = 0
 
-    plt.imshow(obs)
-    plt.show()
+  ep_idx = 0
+  while True:
+    score, step = dqn.run_episode(env)
+    total_score += score
 
-    if not x[1]:
-      plt.imshow(x[0])
-      plt.show()
+    if step > args.num_steps:
+      break
 
-    episode_rew += reward
+    if ep_idx != 0 and ep_idx % 100 == 0:
+      print("step %d, average score over 100 episodes: %f" % (step, total_score / 100))
+      total_score = 0
 
-env.close()
+    ep_idx += 1
+
+  dqn.close()
+  env.close()
+
+  if not args.disable_upload and not args.disable_monitor:
+    gym.upload(ALG_NAME, api_key=config.API_KEY)
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+
+  parser.add_argument("--learning-rate", type=float, default=0.00025)
+  parser.add_argument("--hard-update-frequency", type=int, default=1000)
+  parser.add_argument("--soft-update-rate", type=float, default=None)
+  parser.add_argument("--buffer-size", type=int, default=20000)
+  parser.add_argument("--num-steps", type=int, default=2000000)
+
+  parser.add_argument("--disable-upload", action="store_true", default=False)
+  parser.add_argument("--disable-monitor", action="store_true", default=False)
+
+  parser.add_argument("--monitor-frequency", type=int, default=100, help="0 to disable monitor")
+
+  parsed = parser.parse_args()
+  main(parsed)

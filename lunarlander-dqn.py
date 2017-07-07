@@ -44,7 +44,6 @@ def main(args):
     ep_idx += 1
 
   agent.close()
-
   env.close()
 
   if not args.disable_upload and not args.disable_monitor:
@@ -53,7 +52,7 @@ def main(args):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
 
-  parser.add_argument("--learning-rate", type=float, default=1e-6)
+  parser.add_argument("--learning-rate", type=float, default=0.00025)
   parser.add_argument("--hard-update-frequency", type=int, default=1000)
   parser.add_argument("--soft-update-rate", type=float, default=None)
   parser.add_argument("--buffer-size", type=int, default=250000)
@@ -62,7 +61,7 @@ if __name__ == "__main__":
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)
 
-  parser.add_argument("--monitor-frequency", type=int, default=100)
+  parser.add_argument("--monitor-frequency", type=int, default=100, help="0 to disable monitor")
 
   parsed = parser.parse_args()
   main(parsed)
