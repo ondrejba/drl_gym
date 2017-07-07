@@ -43,7 +43,8 @@ def main(args):
   dqn = DeepQNetwork(nn, prep, (Prep.ATARI_WIDTH, Prep.ATARI_HEIGHT, 4), 4, ALG_NAME,
                      buffer_size=args.buffer_size, hard_update_frequency=args.hard_update_frequency,
                      soft_update_rate=args.soft_update_rate, max_iters=args.num_steps,
-                     lin_exp_end_iter=0.3, lin_exp_final_eps=0.1)
+                     lin_exp_end_iter=0.3, lin_exp_final_eps=0.1, steps_before_learn=args.steps_before_learn,
+                     train_freq=args.train_freq)
 
   total_score = 0
 
@@ -70,11 +71,13 @@ def main(args):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
 
-  parser.add_argument("--learning-rate", type=float, default=0.00025)
+  parser.add_argument("--learning-rate", type=float, default=1e-4)
   parser.add_argument("--hard-update-frequency", type=int, default=1000)
   parser.add_argument("--soft-update-rate", type=float, default=None)
-  parser.add_argument("--buffer-size", type=int, default=20000)
-  parser.add_argument("--num-steps", type=int, default=2000000)
+  parser.add_argument("--buffer-size", type=int, default=10000)
+  parser.add_argument("--num-steps", type=int, default=10000000)
+  parser.add_argument("--steps-before-learn", type=int, default=10000)
+  parser.add_argument("--train-freq", type=int, default=4)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)

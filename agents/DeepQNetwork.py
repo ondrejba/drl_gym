@@ -15,7 +15,8 @@ class DeepQNetwork:
 
   def __init__(self, network, prep, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
                buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None,
-               max_iters=200000, discount=0.99, use_huber_loss=True, detailed_summary=False, max_reward=200):
+               max_iters=200000, discount=0.99, use_huber_loss=True, detailed_summary=False, max_reward=200,
+               steps_before_learn=1000, train_freq=1, save_end=True):
 
     self.network = network
     self.prep = prep
@@ -35,9 +36,11 @@ class DeepQNetwork:
     self.lin_exp_final_eps = lin_exp_final_eps
     self.max_iters = max_iters
     self.step = 0
-    self.steps_before_learn = 1000
+    self.steps_before_learn = steps_before_learn
+    self.train_freq = train_freq
     self.solved = False
     self.max_reward = max_reward
+    self.save_end = save_end
 
     self.actions = None
     self.rewards = None
@@ -62,6 +65,8 @@ class DeepQNetwork:
 
     self.new_summary_dir()
     self.summary_writer = tf.summary.FileWriter(self.summary_dir, self.session.graph)
+
+    self.saver = tf.train.Saver(max_to_keep=None)
 
     init_op = tf.global_variables_initializer()
     self.session.run(init_op)
@@ -200,9 +205,10 @@ class DeepQNetwork:
             "done": int(done)
           })
 
-      if self.step > self.steps_before_learn and not self.solved:
+      if self.step >= self.steps_before_learn and not self.solved:
         # learn
-        self.learn()
+        if self.step % self.train_freq == 0:
+          self.learn()
       else:
         _, self.step = self.session.run([self.inc_global_step, self.global_step])
 
@@ -217,6 +223,9 @@ class DeepQNetwork:
       self.solved = True
     else:
       self.solved = False
+
+    if self.step == self.max_iters:
+      self.saver.save(self.session, self.summary_dir, global_step=self.step)
 
     return total_reward, self.step
 
