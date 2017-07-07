@@ -7,6 +7,8 @@ import utils.config as config
 
 ALG_NAME = "data/deep-q-network"
 
+from utils.Prep import Prep
+
 def main(args):
   env = gym.make("LunarLander-v2")
 
@@ -18,8 +20,10 @@ def main(args):
     "hidden": [128, 64, 32],
     "batch_norm": False
   }
+  prep = Prep(Prep.Type.EXPAND_DIM)
+
   nn = NeuralNetwork(nn_config, NeuralNetwork.Type.MLP)
-  agent = DeepQNetwork(nn, 9, 4, ALG_NAME, learning_rate=args.learning_rate, hard_update_frequency=args.hard_update_frequency,
+  agent = DeepQNetwork(nn, prep, 8, 4, ALG_NAME, learning_rate=args.learning_rate, hard_update_frequency=args.hard_update_frequency,
                        buffer_size=args.buffer_size, soft_update_rate=args.soft_update_rate,
                        max_iters=args.num_steps, exploration=0.2, max_reward=200)
 

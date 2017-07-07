@@ -41,6 +41,7 @@ class NeuralNetwork():
 
   class Type(Enum):
     MLP = 1
+    CNN_MLP = 2
 
   def __init__(self, config, type):
     self.config = config
@@ -48,8 +49,12 @@ class NeuralNetwork():
 
   def build(self, input_dim, output_dim, name):
 
-    if self.type == self.Type.MLP:
-      with tf.variable_scope(name):
-        input_layer = tf.placeholder(tf.float32, shape=(None, input_dim))
-        output_layer = dense_block(input_layer, [*self.config["hidden"], output_dim], "dense", batch_norm_phase=self.config["batch_norm"])
-        return input_layer, output_layer
+    with tf.variable_scope(name):
+
+      if self.type == self.Type.MLP:
+          input_layer = tf.placeholder(tf.float32, shape=(None, input_dim))
+          output_layer = dense_block(input_layer, [*self.config["hidden"], output_dim], "dense", batch_norm_phase=self.config["batch_norm"])
+          return input_layer, output_layer
+      elif self.type == self.Type.CNN_MLP:
+        input_layer = tf.placeholder(tf.float32, shape=(None, input_dim[0], input_dim[1]))
+

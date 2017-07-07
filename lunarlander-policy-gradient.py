@@ -2,7 +2,6 @@ import gym
 import utils.config as config
 
 ALG_NAME = "data/policy-gradient"
-API_KEY = "sk_rQdUjIzcR1eUcA7YwgrVSw"
 
 num_episodes = 20000
 

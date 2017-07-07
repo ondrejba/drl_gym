@@ -2,7 +2,6 @@ import gym
 import utils.config as config
 
 ALG_NAME = "data/deep-q-network"
-API_KEY = "sk_rQdUjIzcR1eUcA7YwgrVSw"
 
 num_steps = 100000
 

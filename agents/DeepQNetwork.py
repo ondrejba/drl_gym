@@ -6,17 +6,19 @@ import os
 import utils.policy as policy
 import utils.architect as architect
 from utils.ReplayBuffer import ReplayBuffer
+from utils.Prep import Prep
 
 class DeepQNetwork:
 
   ACTION_VALUE_NET_NAME = "q-network"
   TARGET_ACTION_VALUE_NET_NAME = "target-q-network"
 
-  def __init__(self, network, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
+  def __init__(self, network, prep, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
                buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None,
                max_iters=200000, discount=0.9, use_huber_loss=True, detailed_summary=False, max_reward=200):
 
     self.network = network
+    self.prep = prep
     self.state_dim = state_dim
     self.action_dim = action_dim
     self.discount = discount
@@ -131,64 +133,76 @@ class DeepQNetwork:
 
     self.target_update = tf.group(*self.target_update)
 
+  def learn(self):
+    # learn
+    batch = self.buffer.sample(self.batch_size)
+
+    merged, self.step, _ = self.session.run([self.merged, self.global_step, self.train_op], feed_dict={
+      self.states: batch["states"],
+      self.actions: batch["actions"],
+      self.rewards: batch["rewards"],
+      self.next_states: batch["next_states"],
+      self.done: batch["done"]
+    })
+
+    self.summary_writer.add_summary(merged, global_step=self.step)
+
+    # target update
+    if self.soft_update_rate is not None:
+      self.session.run(self.target_update)
+    elif self.step % self.hard_update_frequency == 0:
+      self.session.run(self.target_update)
+
   def run_episode(self, env):
 
     state = env.reset()
+    state, skip = self.prep.process(state)
+
     total_reward = 0
 
     while True:
       # play
-      state_vec = np.expand_dims(state, axis=0)
-      q_values = self.session.run(self.q_values, feed_dict={self.states: state_vec})[0]
+      q_values = self.session.run(self.q_values, feed_dict={self.states: state})[0]
 
-      if self.lin_exp_end_iter:
-        if self.lin_exp_final_eps is None:
-          fin_eps = 0
-        else:
-          fin_eps = self.lin_exp_final_eps
-
-        self.epsilon = policy.linear_schedule(self.lin_exp_end_iter, self.max_iters, self.step, final_eps=fin_eps)
-
-      if self.solved:
-        action = policy.greedy(q_values)
+      if skip:
+        action = env.action_space.sample()
       else:
-        action = policy.epsilon_greedy(q_values, self.epsilon)
+        if self.lin_exp_end_iter:
+          if self.lin_exp_final_eps is None:
+            fin_eps = 0
+          else:
+            fin_eps = self.lin_exp_final_eps
+
+          self.epsilon = policy.linear_schedule(self.lin_exp_end_iter, self.max_iters, self.step, final_eps=fin_eps)
+
+        if self.solved:
+          action = policy.greedy(q_values)
+        else:
+          action = policy.epsilon_greedy(q_values, self.epsilon)
 
       action_one_hot = np.zeros(self.action_dim)
       action_one_hot[action] = 1
 
       tmp_state = state
+      tmp_skip = skip
+
       state, reward, done, info = env.step(action)
+      state, skip = self.prep.process(state)
 
       total_reward += reward
 
-      self.buffer.add({
-          "state": tmp_state,
-          "action": action_one_hot,
-          "reward": reward,
-          "next_state": state,
-          "done": int(done)
-        })
+      if not tmp_skip and not tmp_skip:
+        self.buffer.add({
+            "state": tmp_state[0],
+            "action": action_one_hot,
+            "reward": reward,
+            "next_state": state[0],
+            "done": int(done)
+          })
 
       if self.step > self.steps_before_learn and not self.solved:
         # learn
-        batch = self.buffer.sample(self.batch_size)
-
-        merged, self.step, _ = self.session.run([self.merged, self.global_step, self.train_op], feed_dict={
-            self.states: batch["states"],
-            self.actions: batch["actions"],
-            self.rewards: batch["rewards"],
-            self.next_states: batch["next_states"],
-            self.done: batch["done"]
-          })
-
-        self.summary_writer.add_summary(merged, global_step=self.step)
-
-        # target update
-        if self.soft_update_rate is not None:
-          self.session.run(self.target_update)
-        elif self.step % self.hard_update_frequency == 0:
-          self.session.run(self.target_update)
+        self.learn()
       else:
         _, self.step = self.session.run([self.inc_global_step, self.global_step])
 
