@@ -41,6 +41,26 @@ class ReplayBuffer():
       "done": self.done[idxs]
     }
 
+  def compute_state_mean_and_std(self):
+    if self.full:
+      end = self.size
+    else:
+      end = self.next_idx
+
+    state_mean = np.mean(self.states[:end], axis=0)
+    state_std = np.std(self.states[:end], axis=0)
+
+    return state_mean, state_std
+
+  def normalize_states(self, mean, std):
+    if self.full:
+      end = self.size
+    else:
+      end = self.next_idx
+
+    self.states[:end] = (self.states[:end] - mean) / std
+    self.next_states[:end] = (self.next_states[:end] - mean) / std
+
   def get_size(self):
     if not self.full:
       return self.next_idx

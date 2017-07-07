@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import math, os
 
-import agents.utils as utils
+import utils.utils as utils
 
 class MonteCarloPolicyGradient():
 

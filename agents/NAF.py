@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-import agents.architect as architect
+import utils.architect as architect
 
 class NAF():
 

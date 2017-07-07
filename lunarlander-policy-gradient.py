@@ -1,4 +1,5 @@
 import gym
+import utils.config as config
 
 ALG_NAME = "data/policy-gradient"
 API_KEY = "sk_rQdUjIzcR1eUcA7YwgrVSw"
@@ -26,4 +27,4 @@ for i in range(num_episodes):
 agent.close()
 
 env.close()
-gym.upload(ALG_NAME, api_key=API_KEY)
+gym.upload(ALG_NAME, api_key=config.API_KEY)

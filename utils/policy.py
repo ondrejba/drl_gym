@@ -11,3 +11,6 @@ def epsilon_greedy(probabilities, epsilon):
 
 def linear_schedule(fract_iters_end, max_iters, current_iter, final_eps=0):
   return max(final_eps, 1 - current_iter / (fract_iters_end * max_iters))
+
+def greedy(probabilities):
+  return np.argmax(probabilities)

@@ -1,7 +1,7 @@
 import tensorflow as tf
+from enum import Enum
 
-def dense_block(input_node, layers, name, activation=tf.nn.relu, last_layer_activation=False, detailed_summary=False):
-
+def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phase=None, last_layer_activation=False, detailed_summary=False):
   with tf.variable_scope(name):
     output = input_node
     for i, layer in enumerate(layers):
@@ -9,6 +9,8 @@ def dense_block(input_node, layers, name, activation=tf.nn.relu, last_layer_acti
         output = tf.layers.dense(output, layer)
       else:
         output = tf.layers.dense(output, layer, activation=activation)
+        if batch_norm_phase is not None:
+          output = tf.contrib.layers.batch_norm(output, center=True, scale=True, is_training=batch_norm_phase)
 
       if detailed_summary:
         with tf.name_scope("layer_%d_output" % (i + 1)):
@@ -34,3 +36,20 @@ def huber_loss(x, delta=1.0):
     tf.square(x) * 0.5,
     delta * (tf.abs(x) - 0.5 * delta)
   )
+
+class NeuralNetwork():
+
+  class Type(Enum):
+    MLP = 1
+
+  def __init__(self, config, type):
+    self.config = config
+    self.type = type
+
+  def build(self, input_dim, output_dim, name):
+
+    if self.type == self.Type.MLP:
+      with tf.variable_scope(name):
+        input_layer = tf.placeholder(tf.float32, shape=(None, input_dim))
+        output_layer = dense_block(input_layer, [*self.config["hidden"], output_dim], "dense", batch_norm_phase=self.config["batch_norm"])
+        return input_layer, output_layer

@@ -1,19 +1,22 @@
 import tensorflow as tf
 from tensorflow.core.framework import summary_pb2
 import numpy as np
-import math, os, time
+import os
 
-import agents.utils as utils
-import agents.policy as policy
-import agents.architect as architect
-from agents.ReplayBuffer import ReplayBuffer
+import utils.policy as policy
+import utils.architect as architect
+from utils.ReplayBuffer import ReplayBuffer
 
+class DeepQNetwork:
 
-class DeepQNetwork():
+  ACTION_VALUE_NET_NAME = "q-network"
+  TARGET_ACTION_VALUE_NET_NAME = "target-q-network"
 
-  def __init__(self, state_dim, action_dim, name, layers=None, learning_rate=1e-3, update_frequency=500,
-               buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None, max_iters=200000, discount=0.9,
-               use_huber_loss=True, detailed_summary=False, max_reward=200):
+  def __init__(self, network, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
+               buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None,
+               max_iters=200000, discount=0.9, use_huber_loss=True, detailed_summary=False, max_reward=200):
+
+    self.network = network
     self.state_dim = state_dim
     self.action_dim = action_dim
     self.discount = discount
@@ -21,18 +24,10 @@ class DeepQNetwork():
     self.use_huber_loss = use_huber_loss
     self.detailed_summary = detailed_summary
 
-    if layers:
-      self.layers = layers
-    else:
-      self.layers = [
-        64,
-        32,
-        self.action_dim
-      ]
-
     self.learning_rate = learning_rate
     self.batch_size = batch_size
-    self.update_frequency = update_frequency
+    self.hard_update_frequency = hard_update_frequency
+    self.soft_update_rate = soft_update_rate
     self.epsilon = exploration
     self.lin_exp_end_iter = lin_exp_end_iter
     self.lin_exp_final_eps = lin_exp_final_eps
@@ -42,11 +37,28 @@ class DeepQNetwork():
     self.solved = False
     self.max_reward = max_reward
 
+    self.actions = None
+    self.rewards = None
+    self.done = None
+    self.action_q_values = None
+    self.max_target_q_values = None
+    self.targets = None
+    self.global_step = None
+    self.inc_global_step = None
+    self.train_op = None
+    self.states = None
+    self.q_values = None
+    self.next_states = None
+    self.target_q_values = None
+    self.target_update = None
+
     self.build_all()
   
     self.merged = tf.summary.merge_all()
 
     self.session = tf.Session()
+
+    self.new_summary_dir()
     self.summary_writer = tf.summary.FileWriter(self.summary_dir, self.session.graph)
 
     init_op = tf.global_variables_initializer()
@@ -56,12 +68,17 @@ class DeepQNetwork():
 
   def build_all(self):
 
+    self.actions = tf.placeholder(tf.float32, (None, self.action_dim), name="actions")
     self.rewards = tf.placeholder(tf.float32, (None,), name="rewards")
     self.done = tf.placeholder(tf.float32, (None,), name="done")
 
     self.build_network()
     self.build_target_network()
-    self.create_hard_target_update_op()
+
+    if self.soft_update_rate is not None:
+      self.create_soft_target_update_op()
+    else:
+      self.create_hard_target_update_op()
 
     self.action_q_values = tf.reduce_sum(self.q_values * self.actions, axis=1)
     self.max_target_q_values = tf.reduce_max(self.target_q_values, axis=1)
@@ -81,43 +98,31 @@ class DeepQNetwork():
     tf.summary.scalar("loss", loss)
 
     self.global_step = tf.Variable(0, name='global_step', trainable=False)
-    self.inc_global_step = tf.assign(self.global_step, self.global_step + 1)
+    self.inc_global_step = tf.assign(self.global_step, tf.add(self.global_step, 1))
     self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss, global_step=self.global_step)
 
   def build_network(self):
-
-    with tf.variable_scope("network"):
-
-      self.states = tf.placeholder(tf.float32, (None, self.state_dim), name="states")
-      self.actions = tf.placeholder(tf.float32, (None, self.action_dim), name="actions")
-      self.q_values = architect.dense_block(self.states, self.layers, "q-network", detailed_summary=self.detailed_summary)
+    self.states, self.q_values = self.network.build(self.state_dim, self.action_dim, self.ACTION_VALUE_NET_NAME)
 
   def build_target_network(self):
-
-    with tf.variable_scope("target_network"):
-
-      self.next_states = tf.placeholder(tf.float32, (None, self.state_dim), name="next_states")
-      self.target_q_values = architect.dense_block(self.next_states, self.layers, "q-network")
-
-      if self.detailed_summary:
-        architect.variable_summaries(self.target_q_values, name="target_q_values")
+    self.next_states, self.target_q_values = self.network.build(self.state_dim, self.action_dim, self.TARGET_ACTION_VALUE_NET_NAME)
 
   def create_soft_target_update_op(self):
     # inspired by: https://github.com/yukezhu/tensorflow-reinforce/blob/master/rl/neural_q_learner.py
-    net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="network")
-    target_net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="target_network")
+    net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.ACTION_VALUE_NET_NAME)
+    target_net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.TARGET_ACTION_VALUE_NET_NAME)
 
     self.target_update = []
     for v_source, v_target in zip(net_vars, target_net_vars):
       # this is equivalent to target = (1-alpha) * target + alpha * source
-      update_op = v_target.assign_sub(self.target_update_rate * (v_target - v_source))
+      update_op = v_target.assign_sub(self.soft_update_rate * (v_target - v_source))
       self.target_update.append(update_op)
 
     self.target_update = tf.group(*self.target_update)
 
   def create_hard_target_update_op(self):
-    net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="network")
-    target_net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="target_network")
+    net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.ACTION_VALUE_NET_NAME)
+    target_net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.TARGET_ACTION_VALUE_NET_NAME)
 
     self.target_update = []
     for v_source, v_target in zip(net_vars, target_net_vars):
@@ -144,7 +149,10 @@ class DeepQNetwork():
 
         self.epsilon = policy.linear_schedule(self.lin_exp_end_iter, self.max_iters, self.step, final_eps=fin_eps)
 
-      action = policy.epsilon_greedy(q_values, self.epsilon)
+      if self.solved:
+        action = policy.greedy(q_values)
+      else:
+        action = policy.epsilon_greedy(q_values, self.epsilon)
 
       action_one_hot = np.zeros(self.action_dim)
       action_one_hot[action] = 1
@@ -177,7 +185,9 @@ class DeepQNetwork():
         self.summary_writer.add_summary(merged, global_step=self.step)
 
         # target update
-        if self.step % self.update_frequency == 0:
+        if self.soft_update_rate is not None:
+          self.session.run(self.target_update)
+        elif self.step % self.hard_update_frequency == 0:
           self.session.run(self.target_update)
       else:
         _, self.step = self.session.run([self.inc_global_step, self.global_step])
@@ -198,3 +208,11 @@ class DeepQNetwork():
 
   def close(self):
     self.session.close()
+
+  def new_summary_dir(self):
+    i = 1
+    while os.path.isdir(os.path.join(self.summary_dir, "run{}".format(i))):
+      i += 1
+
+    self.summary_dir = os.path.join(self.summary_dir, "run{}".format(i))
+    os.mkdir(self.summary_dir)

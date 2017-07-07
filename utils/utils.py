@@ -3,6 +3,14 @@ import numpy as np
 def sample(probs):
   return np.random.choice(len(probs), None, p=probs)
 
+class MonitorCallable():
+
+  def __init__(self, video_ep_freq=100):
+    self.video_ep_freq = video_ep_freq
+
+  def call(self, idx):
+    return (idx != 0) and (idx % self.video_ep_freq == 0)
+
 class Timer(object):
 
   def __init__(self):
