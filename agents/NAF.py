@@ -1,5 +1,7 @@
+import os
 import tensorflow as tf
 from tensorflow.core.framework import summary_pb2
+from enum import Enum
 
 import utils.architect as architect
 from utils.ReplayBuffer import ReplayBuffer
@@ -10,43 +12,56 @@ class NAF:
   MODEL_NAME = "NAF"
   TARGET_MODEL_NAME = "target-NAF"
 
-  def __init__(self, prep, state_dim, action_dim, buffer_size=10000, batch_size=32, steps_before_train=10000,
-               train_freq=1, max_iters=1000000, max_reward=None, detailed_summary=False):
+  class Build(Enum):
+    SINGLE = 1
+    MULTIPLE = 2
+    HYDRA = 3
+
+  def __init__(self, prep, build, policy, state_dim, action_dim, name, buffer_size=10000, batch_size=100, steps_before_train=10000,
+               train_freq=10, max_iters=1000000, learning_rate=1e-4, update_rate=1e-3, exploration_rate=0.3,
+               max_reward=None, detailed_summary=False):
 
     self.prep = prep
+    self.build_mode = build
+    self.policy = policy
     self.state_dim = state_dim
     self.action_dim = action_dim
+    self.summary_dir = os.path.join(name, "summary")
     self.detailed_summary = detailed_summary
 
     self.discount = 0.99
-    self.learning_rate = 1e-4
-    self.target_update_rate = 1e-3
+    self.learning_rate = learning_rate
+    self.target_update_rate = update_rate
     self.buffer_size = buffer_size
     self.batch_size = batch_size
     self.steps_before_train = steps_before_train
     self.train_freq = train_freq
     self.max_reward = max_reward
     self.max_iters = max_iters
+    self.exploration_rate = exploration_rate
 
     self.step = 0
     self.solved = False
 
     self.state_layers = [
-      64, 32
+      100, 100
     ]
 
     self.mu_layers = [
-      16,
+      200,
+      100,
       self.action_dim
     ]
 
     self.l_layers = [
-      16,
+      200,
+      200,
       (self.action_dim * (self.action_dim + 1)) / 2
     ]
 
     self.v_layers = [
-      16,
+      200,
+      100,
       1
     ]
 
@@ -79,6 +94,14 @@ class NAF:
     self.session = tf.Session()
 
     self.summary_dir = utils.new_summary_dir(self.summary_dir)
+    utils.log_params(self.summary_dir, {
+      "learning rate": self.learning_rate,
+      "batch size": self.batch_size,
+      "update rate": self.target_update_rate,
+      "buffer size": self.buffer_size,
+      "build": self.build_mode.name,
+      "train frequency": self.train_freq
+    })
     self.summary_writer = tf.summary.FileWriter(self.summary_dir, self.session.graph)
 
     self.saver = tf.train.Saver(max_to_keep=None)
@@ -88,8 +111,8 @@ class NAF:
 
   def build(self):
     self.action_inputs = tf.placeholder(tf.float32, (None, self.action_dim))
-    self.reward_inputs = tf.placeholder(tf.float32, (None, 1))
-    self.done = tf.placeholder(tf.float32, (None, 1))
+    self.reward_inputs = tf.placeholder(tf.float32, (None,))
+    self.done = tf.placeholder(tf.float32, (None,))
 
     self.state_inputs, self.state_outputs, self.mu_outputs, self.l_outputs, self.value_outputs = \
       self.build_network(self.MODEL_NAME)
@@ -142,11 +165,28 @@ class NAF:
     with tf.variable_scope(name):
 
       state_inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
-      state_outputs = architect.dense_block(state_inputs, self.state_layers, name="state_branch", detailed_summary=detailed_summary)
 
-      mu_outputs = architect.dense_block(state_outputs, self.mu_layers, "mu_branch", detailed_summary=detailed_summary)
-      l_outputs = architect.dense_block(state_outputs, self.l_layers, "l_branch", detailed_summary=detailed_summary)
-      value_outputs = architect.dense_block(state_outputs, self.v_layers, "value_branch", detailed_summary=detailed_summary)
+      if self.build_mode == self.Build.SINGLE:
+        state_outputs = architect.dense_block(state_inputs, self.state_layers, name="state_branch", detailed_summary=detailed_summary)
+        mu_outputs = architect.dense_block(state_outputs, [self.mu_layers[-1]], "mu_branch", detailed_summary=detailed_summary)
+        l_outputs = architect.dense_block(state_outputs, [self.l_layers[-1]], "l_branch", detailed_summary=detailed_summary)
+        value_outputs = architect.dense_block(state_outputs, [self.v_layers[-1]], "value_branch", detailed_summary=detailed_summary)
+      elif self.build_mode == self.Build.MULTIPLE:
+        state_outputs = None
+        mu_state = architect.dense_block(state_inputs, self.state_layers, name="mu_state", detailed_summary=detailed_summary)
+        l_state = architect.dense_block(state_inputs, self.state_layers, name="l_state", detailed_summary=detailed_summary)
+        value_state = architect.dense_block(state_inputs, self.state_layers, name="value_state", detailed_summary=detailed_summary)
+
+        mu_outputs = architect.dense_block(mu_state, [self.mu_layers[-1]], "mu_branch", detailed_summary=detailed_summary)
+        l_outputs = architect.dense_block(l_state, [self.l_layers[-1]], "l_branch", detailed_summary=detailed_summary)
+        value_outputs = architect.dense_block(value_state, [self.v_layers[-1]], "value_branch", detailed_summary=detailed_summary)
+      elif self.build_mode == self.Build.HYDRA:
+        state_outputs = architect.dense_block(state_inputs, self.state_layers, name="state_branch", detailed_summary=detailed_summary)
+        mu_outputs = architect.dense_block(state_outputs, self.mu_layers, "mu_branch", detailed_summary=detailed_summary)
+        l_outputs = architect.dense_block(state_outputs, self.l_layers, "l_branch", detailed_summary=detailed_summary)
+        value_outputs = architect.dense_block(state_outputs, self.v_layers, "value_branch", detailed_summary=detailed_summary)
+      else:
+        raise ValueError("Wrong build type.")
 
       return state_inputs, state_outputs, mu_outputs, l_outputs, value_outputs
 
@@ -182,6 +222,8 @@ class NAF:
 
   def run_episode(self, env):
 
+    self.policy.reset()
+
     state = env.reset()
     state, skip = self.prep.process(state)
 
@@ -192,12 +234,15 @@ class NAF:
       if skip:
         action = env.action_space.sample()
       else:
-        action = self.mu_outputs
+        action = self.session.run(self.mu_outputs, feed_dict={
+          self.state_inputs: state
+        })[0]
+        action = self.policy.add_noise(action)
 
       tmp_state = state
       tmp_skip = skip
 
-      state, reward, done, info = env.step(action)
+      state, reward, done, _ = env.step(action)
       state, skip = self.prep.process(state)
 
       total_reward += reward
@@ -211,11 +256,13 @@ class NAF:
             "done": int(done)
           })
 
-      if self.step >= self.steps_before_train and self.step % self.train_freq == 0 and not self.solved:
+      if self.step >= self.steps_before_train and not self.solved:
         # learn
-        self.learn()
-
-      _, self.step = self.session.run([self.inc_global_step, self.global_step])
+        for _ in range(self.train_freq):
+          self.learn()
+          _, self.step = self.session.run([self.inc_global_step, self.global_step])
+      else:
+        _, self.step = self.session.run([self.inc_global_step, self.global_step])
 
       if done:
         break

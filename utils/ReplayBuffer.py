@@ -7,10 +7,15 @@ class ReplayBuffer:
     self.next_idx = 0
     self.full = False
 
-    self.states = np.empty((self.size, *state_dim))
+    if isinstance(state_dim, tuple):
+      shape = (self.size, *state_dim)
+    else:
+      shape = (self.size, state_dim)
+
+    self.states = np.empty(shape)
     self.actions = np.empty((self.size, action_dim))
     self.rewards = np.empty(self.size)
-    self.next_states = np.empty((self.size, *state_dim))
+    self.next_states = np.empty(shape)
     self.done = np.empty(self.size)
 
   def add(self, item):

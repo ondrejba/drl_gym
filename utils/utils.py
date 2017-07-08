@@ -13,6 +13,12 @@ def new_summary_dir(summary_dir):
   os.mkdir(summary_dir)
   return summary_dir
 
+def log_params(summary_dir, params):
+
+  with open(os.path.join(summary_dir, "params.txt"), "w") as file:
+    for key in params.keys():
+      file.write("{}: {}\n".format(key, params[key]))
+
 class MonitorCallable:
 
   def __init__(self, video_ep_freq=100):
