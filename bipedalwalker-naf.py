@@ -29,7 +29,8 @@ def main(args):
   agent_policy = policy.GaussianNoiseAnneal(policy.GaussianNoiseAnneal.Mode.LINEAR, 4, 0.5, args.num_steps, 0.1)
 
   agent = NAF(prep, build, agent_policy, 24, 4, ALG_NAME, learning_rate=args.learning_rate, update_rate=args.update_rate,
-              buffer_size=args.buffer_size, max_iters=args.num_steps, detailed_summary=args.detailed_summary)
+              buffer_size=args.buffer_size, max_iters=args.num_steps, detailed_summary=args.detailed_summary,
+              train_freq=1, batch_size=args.batch_size)
 
   total_score = 0
 
@@ -58,6 +59,7 @@ if __name__ == "__main__":
 
   parser.add_argument("--learning-rate", type=float, default=1e-3)
   parser.add_argument("--update-rate", type=float, default=1e-3)
+  parser.add_argument("--batch-size", type=int, default=200)
   parser.add_argument("--buffer-size", type=int, default=100000)
   parser.add_argument("--num-steps", type=int, default=500000)
   parser.add_argument("--build", default="single")

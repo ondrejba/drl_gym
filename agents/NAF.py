@@ -121,7 +121,7 @@ class NAF:
     self.next_state_inputs, self.next_state_outputs, _, _, self.target_value_outputs = \
       self.build_network(self.TARGET_MODEL_NAME)
 
-    self.target = self.reward_inputs + (1 - self.done) * self.discount * self.target_value_outputs
+    self.target = tf.expand_dims(self.reward_inputs, 1) + self.discount * (1 - tf.expand_dims(self.done, 1)) * self.target_value_outputs
 
     # taken from https://github.com/carpedm20/NAF-tensorflow/blob/master/src/network.py
     pivot = 0
@@ -208,7 +208,7 @@ class NAF:
     # learn
     batch = self.buffer.sample(self.batch_size)
 
-    merged, _ = self.session.run([self.merged, self.train_op], feed_dict={
+    merged, targets, _ = self.session.run([self.merged, self.target, self.train_op], feed_dict={
       self.state_inputs: batch["states"],
       self.action_inputs: batch["actions"],
       self.reward_inputs: batch["rewards"],
