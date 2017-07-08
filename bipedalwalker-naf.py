@@ -17,16 +17,16 @@ def main(args):
 
   prep = Prep(Prep.Type.EXPAND_DIM)
 
-  if args.build == "single":
+  if args.build.lower() == "single":
     build = NAF.Build.SINGLE
-  elif args.build == "multiple":
+  elif args.build.lower() == "multiple":
     build = NAF.Build.MULTIPLE
-  elif args.build == "hydra":
+  elif args.build.lower() == "hydra":
     build = NAF.Build.HYDRA
   else:
     raise ValueError("Wrong build type.")
 
-  agent_policy = policy.OrnsteinUhlenbeckNoise(4)
+  agent_policy = policy.GaussianNoiseAnneal(policy.GaussianNoiseAnneal.Mode.LINEAR, 4, 0.5, args.num_steps, 0.1)
 
   agent = NAF(prep, build, agent_policy, 24, 4, ALG_NAME, learning_rate=args.learning_rate, update_rate=args.update_rate,
               buffer_size=args.buffer_size, max_iters=args.num_steps, detailed_summary=args.detailed_summary)

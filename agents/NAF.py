@@ -5,6 +5,7 @@ from enum import Enum
 
 import utils.architect as architect
 from utils.ReplayBuffer import ReplayBuffer
+from utils.PrioritizedReplayBuffer import PrioritizedReplayBuffer
 import utils.utils as utils
 
 class NAF:
@@ -48,19 +49,19 @@ class NAF:
     ]
 
     self.mu_layers = [
-      200,
+      100,
       100,
       self.action_dim
     ]
 
     self.l_layers = [
-      200,
-      200,
+      100,
+      100,
       (self.action_dim * (self.action_dim + 1)) / 2
     ]
 
     self.v_layers = [
-      200,
+      100,
       100,
       1
     ]

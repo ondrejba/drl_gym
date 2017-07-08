@@ -21,8 +21,8 @@ class ReplayBuffer(object):
     def __len__(self):
         return len(self._storage)
 
-    def add(self, obs_t, action, reward, obs_tp1, done):
-        data = (obs_t, action, reward, obs_tp1, done)
+    def add(self, item):
+        data = (item["state"], item["action"], item["reward"], item["next_state"], item["done"])
 
         if self._next_idx >= len(self._storage):
             self._storage.append(data)
@@ -67,7 +67,7 @@ class ReplayBuffer(object):
 
 
 class PrioritizedReplayBuffer(ReplayBuffer):
-    def __init__(self, size, alpha):
+    def __init__(self, size, alpha=0.6):
         """Create Prioritized Replay buffer.
         Parameters
         ----------
@@ -93,10 +93,10 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         self._it_min = MinSegmentTree(it_capacity)
         self._max_priority = 1.0
 
-    def add(self, *args, **kwargs):
+    def add(self, item):
         """See ReplayBuffer.store_effect"""
         idx = self._next_idx
-        super().add(*args, **kwargs)
+        super().add(item)
         self._it_sum[idx] = self._max_priority ** self._alpha
         self._it_min[idx] = self._max_priority ** self._alpha
 
@@ -109,7 +109,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
             res.append(idx)
         return res
 
-    def sample(self, batch_size, beta):
+    def sample(self, batch_size, beta=0.4):
         """Sample a batch of experiences.
         compared to ReplayBuffer.sample
         it also returns importance weights and idxes
