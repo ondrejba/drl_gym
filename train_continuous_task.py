@@ -1,4 +1,5 @@
 import argparse, gym, os
+import tensorflow as tf
 
 import utils.utils as utils
 import utils.policy as policy
@@ -49,6 +50,9 @@ def main(args):
 
   # parse arguments
   args.build = NAF.Build[args.build.upper()]
+
+  # set tensorflow random seed
+  tf.set_random_seed(2018)
 
   # setup agent
   if args.agent.lower() == "naf":

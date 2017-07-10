@@ -6,7 +6,6 @@ import os
 import utils.policy as policy
 import utils.architect as architect
 from utils.ReplayBuffer import ReplayBuffer
-from utils.Prep import Prep
 import utils.utils as utils
 
 class DeepQNetwork:
@@ -14,13 +13,15 @@ class DeepQNetwork:
   ACTION_VALUE_NET_NAME = "q-network"
   TARGET_ACTION_VALUE_NET_NAME = "target-q-network"
 
-  def __init__(self, network, prep, state_dim, action_dim, name, learning_rate=1e-3, hard_update_frequency=500, soft_update_rate=None,
-               buffer_size=50000, batch_size=2, exploration=0.1, lin_exp_end_iter=None, lin_exp_final_eps=None,
-               max_iters=200000, discount=0.99, use_huber_loss=True, detailed_summary=False, max_reward=200,
-               steps_before_learn=1000, train_freq=1, save_end=True):
+  def __init__(self, network, prep, exp_policy, state_dim, action_dim, name, learning_rate=1e-3,
+               hard_update_frequency=500, soft_update_rate=None, buffer_size=50000, batch_size=32, num_steps=200000,
+               discount=0.99, use_huber_loss=True, detailed_summary=False, max_reward=200, steps_before_learn=1000,
+               train_freq=1, save_end=True):
 
     self.network = network
     self.prep = prep
+    self.exp_policy = exp_policy
+    self.greedy_policy = policy.Greedy()
     self.state_dim = state_dim
     self.action_dim = action_dim
     self.discount = discount
@@ -32,10 +33,7 @@ class DeepQNetwork:
     self.batch_size = batch_size
     self.hard_update_frequency = hard_update_frequency
     self.soft_update_rate = soft_update_rate
-    self.epsilon = exploration
-    self.lin_exp_end_iter = lin_exp_end_iter
-    self.lin_exp_final_eps = lin_exp_final_eps
-    self.max_iters = max_iters
+    self.num_steps = num_steps
     self.step = 0
     self.steps_before_learn = steps_before_learn
     self.train_freq = train_freq
@@ -173,18 +171,10 @@ class DeepQNetwork:
       else:
         q_values = self.session.run(self.q_values, feed_dict={self.states: state})[0]
 
-        if self.lin_exp_end_iter:
-          if self.lin_exp_final_eps is None:
-            fin_eps = 0
-          else:
-            fin_eps = self.lin_exp_final_eps
-
-          self.epsilon = policy.linear_schedule(self.lin_exp_end_iter, self.max_iters, self.step, final_eps=fin_eps)
-
         if self.solved:
-          action = policy.greedy(q_values)
+          action = self.greedy_policy.select_action(q_values)
         else:
-          action = policy.epsilon_greedy(q_values, self.epsilon)
+          action = self.exp_policy.select_action(q_values)
 
       action_one_hot = np.zeros(self.action_dim)
       action_one_hot[action] = 1
@@ -224,7 +214,7 @@ class DeepQNetwork:
     else:
       self.solved = False
 
-    if self.step == self.max_iters:
+    if self.step == self.num_steps:
       self.saver.save(self.session, self.summary_dir, global_step=self.step)
 
     return total_reward, self.step

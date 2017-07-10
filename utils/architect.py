@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.contrib.layers.python.layers import initializers
 from enum import Enum
 
 def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phase=None, last_layer_activation=False,
@@ -19,6 +20,27 @@ def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phas
           variable_summaries(output)
 
   return output
+
+def dense(cls, input_layer, shape, dtype=tf.float32, activation=tf.nn.relu, name="dense", detailed_summary=False):
+  with tf.variable_scope(name):
+    w = tf.get_variable("w", shape=shape, dtype=dtype, initializer=initializers.xavier_initializer())
+    b = tf.get_variable("b", shape=shape[1], dtype=dtype, initializer=tf.zeros_initializer())
+    out = tf.nn.bias_add(tf.matmul(input_layer, w), b)
+
+    if detailed_summary:
+      with tf.name_scope('w'):
+        cls.variable_summaries(w)
+
+      with tf.name_scope('b'):
+        cls.variable_summaries(b)
+
+      with tf.name_scope('output'):
+        cls.variable_summaries(out)
+
+    if activation is not None:
+      return activation(out)
+    else:
+      return out
 
 def variable_summaries(var, name="summaries"):
   """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
