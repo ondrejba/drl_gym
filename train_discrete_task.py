@@ -128,6 +128,7 @@ if __name__ == "__main__":
 
   parser.add_argument("--num-steps", type=int, default=100000)
   parser.add_argument("--steps-before-learn", type=int, default=1000)
+  parser.add_argument("--max-reward", type=int, default=None)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)

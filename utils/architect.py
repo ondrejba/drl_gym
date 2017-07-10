@@ -61,6 +61,19 @@ def huber_loss(x, delta=1.0):
     delta * (tf.abs(x) - 0.5 * delta)
   )
 
+def create_target_update_ops(model_name, target_model_name, update_rate):
+  # inspired by: https://github.com/yukezhu/tensorflow-reinforce/blob/master/rl/neural_q_learner.py
+  net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=model_name)
+  target_net_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=target_model_name)
+
+  target_update = []
+  for v_source, v_target in zip(net_vars, target_net_vars):
+    # this is equivalent to target = (1-alpha) * target + alpha * source
+    update_op = v_target.assign_sub(update_rate * (v_target - v_source))
+    target_update.append(update_op)
+
+  return tf.group(*target_update)
+
 class NeuralNetwork:
 
   class Type(Enum):

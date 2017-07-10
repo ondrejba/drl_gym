@@ -44,24 +44,24 @@ class NAF:
     self.solved = False
 
     self.state_layers = [
-      32, 16
+      64, 32
     ]
 
     self.mu_layers = [
-      100,
-      100,
+      16,
+      8,
       self.action_dim
     ]
 
     self.l_layers = [
-      100,
-      100,
+      16,
+      8,
       (self.action_dim * (self.action_dim + 1)) / 2
     ]
 
     self.v_layers = [
-      100,
-      100,
+      16,
+      8,
       1
     ]
 

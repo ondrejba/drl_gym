@@ -66,7 +66,7 @@ class ContinuousPolicy:
 class OrnsteinUhlenbeckNoise(ContinuousPolicy):
   # Reference: https://github.com/rllab/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
 
-  def __init__(self, action_dim, sigma=0.1, mu=0, theta=0.05):
+  def __init__(self, action_dim, theta=0.15, sigma=0.2, mu=0):
     self.action_dim = action_dim
 
     self.mu = mu

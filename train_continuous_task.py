@@ -5,7 +5,6 @@ import utils.utils as utils
 import utils.policy as policy
 import utils.config as config
 from utils.Prep import Prep
-from agents.NAF import NAF
 
 def main(args):
   # algorithm name and monitor directory
@@ -48,18 +47,23 @@ def main(args):
   else:
     raise ValueError("Unknown exploration policy.")
 
-  # parse arguments
-  args.build = NAF.Build[args.naf_build.upper()]
-
   # set random seeds
   tf.set_random_seed(2018)
   env.seed(2018)
 
   # setup agent
   if args.agent.lower() == "naf":
+    from agents.NAF import NAF
+    args.build = NAF.Build[args.naf_build.upper()]
     agent = NAF(prep, args.build, exp_policy, state_shape, action_shape, monitor_directory,
                 num_steps=args.num_steps, learning_rate=args.learning_rate, update_rate=args.update_rate,
-                batch_size=args.batch_size, buffer_size=args.buffer_size, max_reward=args.max_reward)
+                batch_size=args.batch_size, buffer_size=args.buffer_size, max_reward=args.max_reward,
+                train_freq=args.train_freq, steps_before_train=args.steps_before_train)
+  elif args.agent.lower() == "ddpg":
+    from agents.DDPG import DDPG
+    agent = DDPG(prep, exp_policy, state_shape, action_shape, env.action_space.high, env.action_space.low, monitor_directory, num_steps=args.num_steps,
+                 buffer_size=args.buffer_size, max_reward=args.max_reward, steps_before_train=args.steps_before_train)
+
   else:
     raise ValueError("Unknown agent.")
 
@@ -99,13 +103,12 @@ if __name__ == "__main__":
   parser.add_argument("--batch-size", type=int, default=32)
   parser.add_argument("--buffer-size", type=int, default=100000)
   parser.add_argument("--train-freq", type=int, default=1)
-  parser.add_argument("--steps-before-learn", type=int, default=1000)
+  parser.add_argument("--steps-before-train", type=int, default=1000)
 
   parser.add_argument("--naf-build", default="single")
 
-
   parser.add_argument("--num-steps", type=int, default=100000)
-  parser.add_argument("--max-reward", default=None)
+  parser.add_argument("--max-reward", type=int, default=None)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)
