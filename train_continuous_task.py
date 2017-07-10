@@ -47,10 +47,14 @@ def main(args):
   else:
     raise ValueError("Unknown exploration policy.")
 
+  # parse arguments
+  args.build = NAF.Build[args.build.upper()]
+
   # setup agent
   if args.agent.lower() == "naf":
-    agent = NAF(prep, NAF.Build.SINGLE, exp_policy, state_shape, action_shape, monitor_directory,
-                num_steps=args.num_steps)
+    agent = NAF(prep, args.build, exp_policy, state_shape, action_shape, monitor_directory,
+                num_steps=args.num_steps, learning_rate=args.learning_rate, update_rate=args.update_rate,
+                batch_size=args.batch_size, buffer_size=args.buffer_size)
   else:
     raise ValueError("Unknown agent.")
 
@@ -84,6 +88,12 @@ if __name__ == "__main__":
   parser.add_argument("agent", help="name of the agent to use")
   parser.add_argument("prep", help="simple, atari")
   parser.add_argument("policy", help="none, ou, ou_anneal, gaussian_anneal")
+
+  parser.add_argument("--learning-rate", type=float, default=1e-4)
+  parser.add_argument("--update-rate", type=float, default=1e-3)
+  parser.add_argument("--batch-size", type=int, default=32)
+  parser.add_argument("--buffer-size", type=int, default=100000)
+  parser.add_argument("--build", default="single")
 
   parser.add_argument("--num-steps", type=int, default=100000)
 
