@@ -48,8 +48,9 @@ def main(args):
   else:
     raise ValueError("Unknown exploration policy.")
 
-  # set tensorflow random seed
+  # set random seeds
   tf.set_random_seed(2018)
+  env.seed(2018)
 
   # setup network builder
   nn = NeuralNetwork({

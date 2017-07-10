@@ -49,16 +49,17 @@ def main(args):
     raise ValueError("Unknown exploration policy.")
 
   # parse arguments
-  args.build = NAF.Build[args.build.upper()]
+  args.build = NAF.Build[args.naf_build.upper()]
 
-  # set tensorflow random seed
+  # set random seeds
   tf.set_random_seed(2018)
+  env.seed(2018)
 
   # setup agent
   if args.agent.lower() == "naf":
     agent = NAF(prep, args.build, exp_policy, state_shape, action_shape, monitor_directory,
                 num_steps=args.num_steps, learning_rate=args.learning_rate, update_rate=args.update_rate,
-                batch_size=args.batch_size, buffer_size=args.buffer_size)
+                batch_size=args.batch_size, buffer_size=args.buffer_size, max_reward=args.max_reward)
   else:
     raise ValueError("Unknown agent.")
 
@@ -97,9 +98,14 @@ if __name__ == "__main__":
   parser.add_argument("--update-rate", type=float, default=1e-3)
   parser.add_argument("--batch-size", type=int, default=32)
   parser.add_argument("--buffer-size", type=int, default=100000)
-  parser.add_argument("--build", default="single")
+  parser.add_argument("--train-freq", type=int, default=1)
+  parser.add_argument("--steps-before-learn", type=int, default=1000)
+
+  parser.add_argument("--naf-build", default="single")
+
 
   parser.add_argument("--num-steps", type=int, default=100000)
+  parser.add_argument("--max-reward", default=None)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)
