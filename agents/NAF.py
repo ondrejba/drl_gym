@@ -18,8 +18,8 @@ class NAF:
     MULTIPLE = 2
     HYDRA = 3
 
-  def __init__(self, prep, build, policy, state_dim, action_dim, name, buffer_size=10000, batch_size=100, steps_before_train=10000,
-               train_freq=10, max_iters=1000000, learning_rate=1e-4, update_rate=1e-3, exploration_rate=0.3,
+  def __init__(self, prep, build, policy, state_dim, action_dim, monitor_directory, buffer_size=10000, batch_size=32,
+               steps_before_train=100, train_freq=1, num_steps=1000000, learning_rate=1e-3, update_rate=1e-3,
                max_reward=None, detailed_summary=False):
 
     self.prep = prep
@@ -27,7 +27,7 @@ class NAF:
     self.policy = policy
     self.state_dim = state_dim
     self.action_dim = action_dim
-    self.summary_dir = os.path.join(name, "summary")
+    self.summary_dir = os.path.join(monitor_directory, "summary")
     self.detailed_summary = detailed_summary
 
     self.discount = 0.99
@@ -38,14 +38,13 @@ class NAF:
     self.steps_before_train = steps_before_train
     self.train_freq = train_freq
     self.max_reward = max_reward
-    self.max_iters = max_iters
-    self.exploration_rate = exploration_rate
+    self.max_iters = num_steps
 
     self.step = 0
     self.solved = False
 
     self.state_layers = [
-      100, 100
+      32, 16
     ]
 
     self.mu_layers = [

@@ -58,7 +58,7 @@ CONTINUOUS
 class ContinuousPolicy:
 
   def add_noise(self, action):
-    pass
+    return action
 
   def reset(self):
     pass

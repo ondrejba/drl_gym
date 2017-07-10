@@ -57,12 +57,15 @@ def main(args):
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
 
-  parser.add_argument("--learning-rate", type=float, default=1e-3)
+  parser.add_argument("--learning-rate", type=float, default=1e-4)
   parser.add_argument("--update-rate", type=float, default=1e-3)
-  parser.add_argument("--batch-size", type=int, default=200)
+  parser.add_argument("--batch-size", type=int, default=32)
   parser.add_argument("--buffer-size", type=int, default=100000)
   parser.add_argument("--num-steps", type=int, default=500000)
   parser.add_argument("--build", default="single")
+
+  parser.add_argument("--exploration-length", default=0.5)
+  parser.add_argument("--exploration-final", default=0.1)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)

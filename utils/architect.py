@@ -1,7 +1,8 @@
 import tensorflow as tf
 from enum import Enum
 
-def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phase=None, last_layer_activation=False, detailed_summary=False):
+def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phase=None, last_layer_activation=False,
+                detailed_summary=False):
   with tf.variable_scope(name):
     output = input_node
     for i, layer in enumerate(layers):
@@ -9,6 +10,7 @@ def dense_block(input_node, layers, name, activation=tf.nn.relu, batch_norm_phas
         output = tf.layers.dense(output, layer)
       else:
         output = tf.layers.dense(output, layer, activation=activation)
+
         if batch_norm_phase is not None:
           output = tf.contrib.layers.batch_norm(output, center=True, scale=True, is_training=batch_norm_phase)
 

@@ -5,6 +5,9 @@ def sample(probs):
   return np.random.choice(len(probs), None, p=probs)
 
 def new_summary_dir(summary_dir):
+  if not os.path.isdir(summary_dir):
+    os.mkdir(summary_dir)
+
   i = 1
   while os.path.isdir(os.path.join(summary_dir, "run{}".format(i))):
     i += 1
