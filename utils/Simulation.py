@@ -1,4 +1,4 @@
-import gym
+import gym, math
 import numpy as np
 
 def factory(env):
@@ -12,16 +12,26 @@ def factory(env):
       self.__dict__.update(env.__dict__)
 
       # state
-      self.state_mean = (env.observation_space.high + env.observation_space.low) / 2
-      self.state_diff = (env.observation_space.high - env.observation_space.low) / 2
+      if math.inf not in self.observation_space.high and - math.inf not in self.observation_space.low:
+        self.state_mean = (env.observation_space.high + env.observation_space.low) / 2
+        self.state_diff = (env.observation_space.high - env.observation_space.low) / 2
+
+        self.observation_space = gym.spaces.Box(self.filter_state(env.observation_space.low),
+                                                self.filter_state(env.observation_space.high))
+      else:
+        self.state_mean = None
+        self.state_diff = None
 
       # actions
-      self.actions_mean = (env.action_space.high + env.action_space.low) / 2
-      self.actions_diff = (env.action_space.high - env.action_space.low) / 2
+      if math.inf not in self.action_space.high and - math.inf not in self.action_space.low:
+        self.actions_mean = (env.action_space.high + env.action_space.low) / 2
+        self.actions_diff = (env.action_space.high - env.action_space.low) / 2
 
-      self.observation_space = gym.spaces.Box(self.filter_state(env.observation_space.low),
-                                              self.filter_state(env.observation_space.high))
-      self.action_space = gym.spaces.Box(- np.ones_like(env.action_space.high), np.ones_like(env.action_space.high))
+
+        self.action_space = gym.spaces.Box(- np.ones_like(env.action_space.high), np.ones_like(env.action_space.high))
+      else:
+        self.actions_mean = None
+        self.actions_diff = None
 
     def step(self, action):
       filtered_action = np.clip(self.filter_action(action), self.action_space.low, self.action_space.high)
@@ -32,9 +42,15 @@ def factory(env):
       return filtered_state, reward, done, info
 
     def filter_state(self, state):
-      return (state - self.state_mean) / self.state_diff
+      if self.state_mean is None or self.state_diff is None:
+        return state
+      else:
+        return (state - self.state_mean) / self.state_diff
 
     def filter_action(self, action):
-      return action * self.actions_diff + self.actions_mean
+      if self.actions_mean is None or self.actions_diff is None:
+        return action
+      else:
+        return action * self.actions_diff + self.actions_mean
 
   return FilteredEnv()

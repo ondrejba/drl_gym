@@ -19,7 +19,7 @@ class DDPG:
   def __init__(self, prep, policy, state_dim, action_dim, action_high, action_low, monitor_directory, actor_learning_rate=1e-4, critic_learning_rate=1e-3,
                critic_target_update_rate=1e-3, actor_target_update_rate=1e-3, discount=0.99,
                l2_decay=1e-2, buffer_size=1000000, steps_before_train=10000, max_reward=None, train_freq=1,
-               num_steps=500000, batch_size=64, detail_summary=False):
+               num_steps=500000, batch_size=64, detail_summary=False, tanh_action=True):
 
     self.prep = prep
     self.policy = policy
@@ -42,6 +42,7 @@ class DDPG:
     self.num_steps = num_steps
     self.summary_dir = os.path.join(monitor_directory, "summary")
     self.detail_summary = detail_summary
+    self.tanh_action = tanh_action
 
     self.step = 0
     self.solved = False
@@ -152,12 +153,10 @@ class DDPG:
           architect.variable_summaries(output_layer, "output_layer")
         ]
 
-      if self.action_high == math.inf and self.action_low == - math.inf:
-        return output_layer
-      elif abs(self.action_high) == abs(self.action_low):
+      if self.tanh_action:
         return tf.nn.tanh(output_layer)
       else:
-        raise ValueError("Asymmetric action range.")
+        return output_layer
 
   def build(self):
 
