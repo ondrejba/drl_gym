@@ -91,7 +91,7 @@ class OrnsteinUhlenbeckNoiseAnneal(ContinuousPolicy):
   class Mode(Enum):
     LINEAR = 1
 
-  def __init__(self, action_dim, fract_iters, max_iters, final_fract, sigma=0.3, theta=0.15, mu=0):
+  def __init__(self, action_dim, fract_iters, max_iters, final_fract, theta=0.15, sigma=0.2, mu=0):
     self.action_dim = action_dim
 
     self.mu = mu
