@@ -19,7 +19,7 @@ class DDPG:
   def __init__(self, prep, policy, state_dim, action_dim, action_high, action_low, monitor_directory, actor_learning_rate=1e-4, critic_learning_rate=1e-3,
                critic_target_update_rate=1e-3, actor_target_update_rate=1e-3, discount=0.99,
                l2_decay=1e-2, buffer_size=1000000, steps_before_train=10000, max_reward=None, train_freq=1,
-               num_steps=500000, batch_size=64, detail_summary=False, tanh_action=True):
+               num_steps=500000, batch_size=64, detail_summary=False, tanh_action=True, batch_norm=False):
 
     self.prep = prep
     self.policy = policy
@@ -43,6 +43,7 @@ class DDPG:
     self.summary_dir = os.path.join(monitor_directory, "summary")
     self.detail_summary = detail_summary
     self.tanh_action = tanh_action
+    self.batch_norm = batch_norm
 
     self.step = 0
     self.solved = False
@@ -74,6 +75,10 @@ class DDPG:
 
   def build_critic(self, name, state_input, action_input):
 
+    bn_training = self.is_training
+    if name == self.TARGET_CRITIC_NAME:
+      bn_training = False
+
     with tf.variable_scope(name):
 
       # weights and biases
@@ -89,8 +94,15 @@ class DDPG:
       b3 = tf.Variable(tf.random_uniform((1,), -3e-3, 3e-3), name="b3")
 
       # layers
+      if self.batch_norm:
+        state_input = tf.layers.batch_normalization(state_input, training=bn_training, momentum=0.9, epsilon=1e-5)
+
       layer_1 = tf.nn.relu(tf.matmul(state_input, W1) + b1)
+      if self.batch_norm:
+        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training, momentum=0.9, epsilon=1e-5)
+
       layer_2 = tf.nn.relu(tf.matmul(layer_1, W2) + tf.matmul(action_input, W2_action) + b2)
+
       output_layer = tf.matmul(layer_2, W3) + b3
 
       # summary
@@ -119,6 +131,10 @@ class DDPG:
 
   def build_actor(self, name, state_input):
 
+    bn_training = self.is_training
+    if name == self.TARGET_ACTOR_NAME:
+      bn_training = False
+
     with tf.variable_scope(name):
 
       # weights and biases
@@ -132,8 +148,17 @@ class DDPG:
       b3 = tf.Variable(tf.random_uniform((self.action_dim,), -3e-3, 3e-3), name="b3")
 
       # layers
+      if self.batch_norm:
+        state_input = tf.layers.batch_normalization(state_input, training=bn_training, momentum=0.9, epsilon=1e-5)
+
       layer_1 = tf.nn.relu(tf.matmul(state_input, W1) + b1)
+      if self.batch_norm:
+        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training, momentum=0.9, epsilon=1e-5)
+
       layer_2 = tf.nn.relu(tf.matmul(layer_1, W2) + b2)
+      if self.batch_norm:
+        layer_2 = tf.layers.batch_normalization(layer_2, training=bn_training, momentum=0.9, epsilon=1e-5)
+
       output_layer = tf.matmul(layer_2, W3) + b3
 
       # summary
@@ -165,6 +190,7 @@ class DDPG:
     self.action_input = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="action_input")
     self.reward_input = tf.placeholder(tf.float32, shape=(None,), name="reward_input")
     self.done_input = tf.placeholder(tf.float32, shape=(None,), name="done_input")
+    self.is_training = tf.placeholder(tf.bool, name="is_training")
 
     # inputs summary
     if self.detail_summary:
@@ -194,7 +220,6 @@ class DDPG:
 
     self.critic_train_op = tf.train.AdamOptimizer(self.critic_learning_rate).minimize(self.loss)
 
-
     self.action = self.build_actor(self.ACTOR_NAME, self.state_input)
     self.actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.ACTOR_NAME)
     self.action_gradients = tf.gradients(self.q_value, self.action_input)[0]
@@ -221,12 +246,14 @@ class DDPG:
   def train_actor(self, states):
 
     actions = self.session.run(self.action, feed_dict={
-      self.state_input: states
+      self.state_input: states,
+      self.is_training: False
     })
 
     self.session.run(self.actor_train_op, feed_dict={
       self.state_input: states,
-      self.action_input: actions
+      self.action_input: actions,
+      self.is_training: True
     })
 
   def train_critic(self, states, actions, rewards, next_states, done):
@@ -235,7 +262,8 @@ class DDPG:
       self.action_input: actions,
       self.reward_input: rewards,
       self.next_state_input: next_states,
-      self.done_input: done
+      self.done_input: done,
+      self.is_training: True
     })
     self.summary_writer.add_summary(summary, global_step=self.step)
 
@@ -259,7 +287,8 @@ class DDPG:
         action = env.action_space.sample()
       else:
         action = self.session.run(self.action, feed_dict={
-          self.state_input: state
+          self.state_input: state,
+          self.is_training: False
         })[0]
 
         if not eval and not self.solved:

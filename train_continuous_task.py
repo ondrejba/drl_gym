@@ -64,7 +64,7 @@ def main(args):
     from agents.DDPG import DDPG
     agent = DDPG(prep, exp_policy, state_shape, action_shape, env.action_space.high, env.action_space.low, monitor_directory, num_steps=args.num_steps,
                  buffer_size=args.buffer_size, max_reward=args.max_reward, steps_before_train=args.steps_before_train,
-                 detail_summary=args.detail_summary, batch_size=args.batch_size)
+                 detail_summary=args.detail_summary, batch_size=args.batch_size, batch_norm=args.batch_norm)
 
   else:
     raise ValueError("Unknown agent.")
@@ -121,6 +121,7 @@ if __name__ == "__main__":
   parser.add_argument("--buffer-size", type=int, default=1000000)
   parser.add_argument("--train-freq", type=int, default=1)
   parser.add_argument("--steps-before-train", type=int, default=10000)
+  parser.add_argument("--batch-norm", default=False, action="store_true")
 
   parser.add_argument("--ou-theta", type=float, default=0.15)
   parser.add_argument("--ou-sigma", type=float, default=0.2)
