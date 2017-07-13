@@ -39,7 +39,7 @@ def main(args):
   if args.policy.lower() == "none":
     exp_policy = policy.ContinuousPolicy()
   elif args.policy.lower() == "ou":
-    exp_policy = policy.OrnsteinUhlenbeckNoise(action_shape)
+    exp_policy = policy.OrnsteinUhlenbeckNoise(action_shape, theta=args.ou_theta, sigma=args.ou_sigma)
   elif args.policy.lower() == "ou_anneal":
     exp_policy = policy.OrnsteinUhlenbeckNoiseAnneal(action_shape, 0.5, args.num_steps, 0.1)
   elif args.policy.lower() == "gaussian_anneal":
@@ -92,6 +92,15 @@ def main(args):
 
     ep_idx += 1
 
+  # run 100 eval episodes at the end
+  eval_score = 0
+  for ep_idx in range(ep_idx, ep_idx + 100):
+    score, _ = agent.run_episode(env, eval=True, ep_idx=ep_idx, learn=False)
+    eval_score += score
+
+  eval_score = eval_score / 100
+  print("final evaluation score: {:.2f}".format(eval_score))
+
   agent.close()
   env.close()
 
@@ -112,6 +121,9 @@ if __name__ == "__main__":
   parser.add_argument("--buffer-size", type=int, default=1000000)
   parser.add_argument("--train-freq", type=int, default=1)
   parser.add_argument("--steps-before-train", type=int, default=10000)
+
+  parser.add_argument("--ou-theta", type=float, default=0.15)
+  parser.add_argument("--ou-sigma", type=float, default=0.2)
 
   parser.add_argument("--naf-build", default="single")
 

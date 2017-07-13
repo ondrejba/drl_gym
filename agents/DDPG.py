@@ -244,7 +244,7 @@ class DDPG:
     self.train_actor(batch["states"])
     self.session.run([self.target_critic_update, self.target_actor_update])
 
-  def run_episode(self, env, eval=False, ep_idx=0):
+  def run_episode(self, env, eval=False, ep_idx=0, learn=True):
 
     self.policy.reset()
 
@@ -285,7 +285,7 @@ class DDPG:
           })
 
       if not eval:
-        if self.step >= self.steps_before_train and not self.solved:
+        if self.step >= self.steps_before_train and not self.solved and learn:
           # learn
           for _ in range(self.train_freq):
             self.train_step(self.buffer.sample(self.batch_size))
