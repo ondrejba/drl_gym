@@ -2,7 +2,7 @@ import numpy as np
 
 class ContinuousSimulation:
 
-  def __init__(self, env, agent, policy, prep, steps_before_train=100, train_freq=1):
+  def __init__(self, env, agent, policy, prep, steps_before_train=100, train_freq=1, drop_end=False):
     self.env = env
     self.agent = agent
     self.policy = policy
@@ -10,6 +10,7 @@ class ContinuousSimulation:
 
     self.steps_before_train = steps_before_train
     self.train_freq = train_freq
+    self.drop_end = drop_end
 
     self.step = 0
     self.learn_step = 0
@@ -45,15 +46,16 @@ class ContinuousSimulation:
 
 
       if not prev_skip and not skip:
-        transition = {
-          "state": prev_state[0],
-          "action": action,
-          "reward": reward,
-          "next_state": state[0],
-          "done": int(done)
-        }
+        if not self.drop_end or not done:
+          transition = {
+            "state": prev_state[0],
+            "action": action,
+            "reward": reward,
+            "next_state": state[0],
+            "done": int(done)
+          }
 
-        self.agent.perceive(transition)
+          self.agent.perceive(transition)
 
       if not eval_run and self.step >= self.steps_before_train:
         # learn

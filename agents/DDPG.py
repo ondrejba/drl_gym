@@ -16,7 +16,7 @@ class DDPG:
 
   def __init__(self, state_dim, action_dim, monitor_directory, actor_learning_rate=1e-4, critic_learning_rate=1e-3,
                critic_target_update_rate=1e-3, actor_target_update_rate=1e-3, discount=0.99, l2_decay=1e-2,
-               buffer_size=1000000, batch_size=64, detail_summary=False, tanh_action=True, batch_norm=False):
+               buffer_size=1000000, batch_size=64, detail_summary=False, tanh_action=True, batch_norm=True):
 
     self.state_dim = state_dim
     self.action_dim = action_dim
@@ -287,5 +287,5 @@ class DDPG:
       self.done_input: done,
       self.is_training: True
     })
-    self.summary_writer.add_summary(summary, global_step=self.step)
+    self.summary_writer.add_summary(summary, global_step=self.session.run(self.global_step))
 

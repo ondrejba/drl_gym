@@ -70,18 +70,23 @@ def main(args):
 
   # setup simulation
   sim = ContinuousSimulation(env, agent, exp_policy, prep, steps_before_train=args.steps_before_train, train_freq=args.train_freq)
+  solved = False
 
   # learn
   while True:
 
-    sim.run_episode(eval_run=False)
+    score = sim.run_episode(eval_run=solved)
 
     if sim.ep_step != 0 and sim.ep_step % args.evaluation_frequency == 0:
       eval_score = sim.eval_avg(args.num_evaluations)
       print("{:d}: avg. score over {:d} evaluations: {:.02f}".format(sim.ep_step, args.num_evaluations, eval_score))
 
+      if args.max_reward is not None:
+        solved = eval_score >= args.max_reward
+
+
     if args.num_steps is not None:
-      if sim.learn_step > args.num_steps:
+      if sim.step > args.num_steps:
         break
     elif args.num_eps is not None:
       if sim.ep_step > args.num_eps:
@@ -110,7 +115,7 @@ if __name__ == "__main__":
   parser.add_argument("--batch-size", type=int, default=64)
   parser.add_argument("--buffer-size", type=int, default=1000000)
   parser.add_argument("--train-freq", type=int, default=1)
-  parser.add_argument("--steps-before-train", type=int, default=10000)
+  parser.add_argument("--steps-before-train", type=int, default=1000)
   parser.add_argument("--batch-norm", default=False, action="store_true")
 
   parser.add_argument("--ou-theta", type=float, default=0.15)
@@ -120,6 +125,7 @@ if __name__ == "__main__":
 
   parser.add_argument("--num-steps", type=int)
   parser.add_argument("--num-eps", type=int)
+  parser.add_argument("--max-reward", type=int)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)

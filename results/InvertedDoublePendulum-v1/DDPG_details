@@ -1,0 +1,4 @@
+episodes before solve: 4498
+
+DDPG - fully-connected - exactly as described in the paper
+state batch normalization for actor and critic
