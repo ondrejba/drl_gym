@@ -5,7 +5,7 @@ import utils.utils as utils
 import utils.policy as policy
 import utils.config as config
 from utils.Prep import Prep
-import utils.Simulation as Simulation
+from utils.Simulation import ContinuousSimulation
 
 def main(args):
   # algorithm name and monitor directory
@@ -62,43 +62,33 @@ def main(args):
                 train_freq=args.train_freq, steps_before_train=args.steps_before_train)
   elif args.agent.lower() == "ddpg":
     from agents.DDPG import DDPG
-    agent = DDPG(prep, exp_policy, state_shape, action_shape, env.action_space.high, env.action_space.low, monitor_directory, num_steps=args.num_steps,
-                 buffer_size=args.buffer_size, max_reward=args.max_reward, steps_before_train=args.steps_before_train,
+    agent = DDPG(state_shape, action_shape, monitor_directory, buffer_size=args.buffer_size,
                  detail_summary=args.detail_summary, batch_size=args.batch_size, batch_norm=args.batch_norm)
 
   else:
     raise ValueError("Unknown agent.")
 
-  # learn
-  ep_idx = 0
+  # setup simulation
+  sim = ContinuousSimulation(env, agent, exp_policy, prep, steps_before_train=args.steps_before_train, train_freq=args.train_freq)
 
+  # learn
   while True:
 
-    if ep_idx % args.evaluation_frequency == 0 and ep_idx != 0:
-      total_score = 0
+    sim.run_episode(eval_run=False)
 
-      for eval_idx in range(args.num_evaluations):
-        score, _ = agent.run_episode(env, eval=True, ep_idx=ep_idx)
-        total_score += score
-        ep_idx += 1
+    if sim.ep_step != 0 and sim.ep_step % args.evaluation_frequency == 0:
+      eval_score = sim.eval_avg(args.num_evaluations)
+      print("{:d}: avg. score over {:d} evaluations: {:.02f}".format(sim.ep_step, args.num_evaluations, eval_score))
 
-      avg_score = total_score / args.num_evaluations
-      print("{:d}: avg. score over {:d} evaluations: {:.02f}".format(ep_idx, args.num_evaluations, avg_score))
-
-    _, step = agent.run_episode(env, eval=False, ep_idx=ep_idx)
-
-    if step > args.num_steps:
-      break
-
-    ep_idx += 1
+    if args.num_steps is not None:
+      if sim.learn_step > args.num_steps:
+        break
+    elif args.num_eps is not None:
+      if sim.ep_step > args.num_eps:
+        break
 
   # run 100 eval episodes at the end
-  eval_score = 0
-  for ep_idx in range(ep_idx, ep_idx + 100):
-    score, _ = agent.run_episode(env, eval=True, ep_idx=ep_idx, learn=False)
-    eval_score += score
-
-  eval_score = eval_score / 100
+  eval_score = sim.eval_avg(100)
   print("final evaluation score: {:.2f}".format(eval_score))
 
   agent.close()
@@ -128,8 +118,8 @@ if __name__ == "__main__":
 
   parser.add_argument("--naf-build", default="single")
 
-  parser.add_argument("--num-steps", type=int, default=100000)
-  parser.add_argument("--max-reward", type=float, default=None)
+  parser.add_argument("--num-steps", type=int)
+  parser.add_argument("--num-eps", type=int)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)
