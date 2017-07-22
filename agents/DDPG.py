@@ -95,11 +95,12 @@ class DDPG:
 
       # layers
       if self.batch_norm:
-        state_input = tf.layers.batch_normalization(state_input, training=bn_training, momentum=0.9, epsilon=1e-5)
+        state_input = tf.layers.batch_normalization(state_input, training=bn_training)
 
-      layer_1 = tf.nn.relu(tf.matmul(state_input, W1) + b1)
-      if self.batch_norm:
-        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training, momentum=0.9, epsilon=1e-5)
+      layer_1 = tf.matmul(state_input, W1) + b1
+      #if self.batch_norm:
+      #  layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+      layer_1 = tf.nn.relu(layer_1)
 
       layer_2 = tf.nn.relu(tf.matmul(layer_1, W2) + tf.matmul(action_input, W2_action) + b2)
 
@@ -149,15 +150,17 @@ class DDPG:
 
       # layers
       if self.batch_norm:
-        state_input = tf.layers.batch_normalization(state_input, training=bn_training, momentum=0.9, epsilon=1e-5)
+        state_input = tf.layers.batch_normalization(state_input, training=bn_training)
 
-      layer_1 = tf.nn.relu(tf.matmul(state_input, W1) + b1)
-      if self.batch_norm:
-        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training, momentum=0.9, epsilon=1e-5)
+      layer_1 = tf.matmul(state_input, W1) + b1
+      #if self.batch_norm:
+      #  layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+      layer_1 = tf.nn.relu(layer_1)
 
-      layer_2 = tf.nn.relu(tf.matmul(layer_1, W2) + b2)
-      if self.batch_norm:
-        layer_2 = tf.layers.batch_normalization(layer_2, training=bn_training, momentum=0.9, epsilon=1e-5)
+      layer_2 = tf.matmul(layer_1, W2) + b2
+      #if self.batch_norm:
+      #  layer_2 = tf.layers.batch_normalization(layer_2, training=bn_training)
+      layer_2 = tf.nn.relu(layer_2)
 
       output_layer = tf.matmul(layer_2, W3) + b3
 

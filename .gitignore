@@ -2,3 +2,4 @@
 /gym
 /.idea
 /utils/config.py
+__pycache__

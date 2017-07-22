@@ -13,7 +13,7 @@ def main(args):
   monitor_directory = os.path.join("data", alg_name)
 
   # setup the environment
-  env = Simulation.factory(gym.make(args.env))
+  env = utils.filtered_env_factory(gym.make(args.env))
 
   if not args.disable_monitor:
     monitor_callable = utils.MonitorCallable(args.monitor_frequency)
