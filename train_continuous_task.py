@@ -63,7 +63,7 @@ def main(args):
   elif args.agent.lower() == "ddpg":
     from agents.DDPG import DDPG
     agent = DDPG(state_shape, action_shape, monitor_directory, buffer_size=args.buffer_size,
-                 detail_summary=args.detail_summary, batch_size=args.batch_size, batch_norm=args.batch_norm)
+                 detail_summary=args.detailed_summary, batch_size=args.batch_size, batch_norm=args.batch_norm)
 
   else:
     raise ValueError("Unknown agent.")
