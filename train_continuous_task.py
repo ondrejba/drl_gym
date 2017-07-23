@@ -72,10 +72,20 @@ def main(args):
   sim = ContinuousSimulation(env, agent, exp_policy, prep, steps_before_train=args.steps_before_train, train_freq=args.train_freq)
   solved = False
 
+  # print message
+  if args.num_steps is not None:
+    m_type = "steps"
+    m_val = args.num_steps
+  else:
+    m_type = "episodes"
+    m_val = args.num_eps
+
+  print("\nTraining agent {:s} on {:s} for {:d} {:s}.\n".format(args.agent, args.env, m_val, m_type))
+
   # learn
   while True:
 
-    score = sim.run_episode(eval_run=solved)
+    sim.run_episode(eval_run=solved)
 
     if sim.ep_step != 0 and sim.ep_step % args.evaluation_frequency == 0:
       eval_score = sim.eval_avg(args.num_evaluations)
@@ -94,7 +104,10 @@ def main(args):
 
   # run 100 eval episodes at the end
   eval_score = sim.eval_avg(100)
-  print("final evaluation score: {:.2f}".format(eval_score))
+  print("Final evaluation score: {:.2f}.".format(eval_score))
+
+  agent.save()
+  print("Agent saved to {}.".format(agent.summary_dir))
 
   agent.close()
   env.close()
@@ -125,7 +138,7 @@ if __name__ == "__main__":
 
   parser.add_argument("--num-steps", type=int)
   parser.add_argument("--num-eps", type=int)
-  parser.add_argument("--max-reward", type=int)
+  parser.add_argument("--max-reward", type=float)
 
   parser.add_argument("--disable-upload", action="store_true", default=False)
   parser.add_argument("--disable-monitor", action="store_true", default=False)

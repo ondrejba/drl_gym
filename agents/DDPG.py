@@ -85,6 +85,9 @@ class DDPG:
     summary_2 = summary_pb2.Summary(value=[summary_value])
     self.summary_writer.add_summary(summary_2, global_step=index)
 
+  def save(self):
+    self.saver.save(self.session, self.summary_dir, global_step=self.session.run(self.global_step))
+
   def close(self):
     self.session.close()
 
