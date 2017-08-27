@@ -63,13 +63,16 @@ def main(args):
   elif args.agent.lower() == "ddpg":
     from agents.DDPG import DDPG
     agent = DDPG(state_shape, action_shape, monitor_directory, buffer_size=args.buffer_size,
-                 detail_summary=args.detailed_summary, batch_size=args.batch_size, batch_norm=args.batch_norm)
+                 detail_summary=args.detailed_summary, batch_size=args.batch_size,
+                 input_batch_norm=args.input_batch_norm, all_batch_norm=args.all_batch_norm,
+                 log_frequency=args.log_frequency)
 
   else:
     raise ValueError("Unknown agent.")
 
   # setup simulation
-  sim = ContinuousSimulation(env, agent, exp_policy, prep, steps_before_train=args.steps_before_train, train_freq=args.train_freq)
+  sim = ContinuousSimulation(env, agent, exp_policy, prep, steps_before_train=args.steps_before_train,
+                             train_freq=args.train_freq)
   solved = False
 
   # print message
@@ -93,7 +96,6 @@ def main(args):
 
       if args.max_reward is not None:
         solved = eval_score >= args.max_reward
-
 
     if args.num_steps is not None:
       if sim.step > args.num_steps:
@@ -128,8 +130,9 @@ if __name__ == "__main__":
   parser.add_argument("--batch-size", type=int, default=64)
   parser.add_argument("--buffer-size", type=int, default=1000000)
   parser.add_argument("--train-freq", type=int, default=1)
-  parser.add_argument("--steps-before-train", type=int, default=1000)
-  parser.add_argument("--batch-norm", default=False, action="store_true")
+  parser.add_argument("--steps-before-train", type=int, default=10000)
+  parser.add_argument("--input-batch-norm", default=False, action="store_true")
+  parser.add_argument("--all-batch-norm", default=False, action="store_true")
 
   parser.add_argument("--ou-theta", type=float, default=0.15)
   parser.add_argument("--ou-sigma", type=float, default=0.2)
@@ -145,10 +148,10 @@ if __name__ == "__main__":
 
   parser.add_argument("--detailed-summary", action="store_true", default=False)
   parser.add_argument("--monitor-frequency", type=int, default=100, help="0 to disable monitor")
-  parser.add_argument("--log-frequency", type=int, default=100)
+  parser.add_argument("--log-frequency", type=int, default=10)
   parser.add_argument("--evaluation-frequency", type=int, default=100)
   parser.add_argument("--num-evaluations", type=int, default=5)
-  parser.add_argument("--detail-summary", action="store_true")
+  parser.add_argument("--detail-summary", action="store_true", default=False)
 
   parsed = parser.parse_args()
   main(parsed)

@@ -44,7 +44,6 @@ class ContinuousSimulation:
 
       episode_reward += reward
 
-
       if not prev_skip and not skip:
         if not self.drop_end or not done:
           transition = {

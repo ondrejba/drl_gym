@@ -14,9 +14,10 @@ class DDPG:
   ACTOR_NAME = "actor"
   TARGET_ACTOR_NAME = "target_actor"
 
-  def __init__(self, state_dim, action_dim, monitor_directory, actor_learning_rate=1e-4, critic_learning_rate=1e-3,
+  def __init__(self, state_dim, action_dim, monitor_directory, actor_learning_rate=1e-5, critic_learning_rate=1e-3,
                critic_target_update_rate=1e-3, actor_target_update_rate=1e-3, discount=0.99, l2_decay=1e-2,
-               buffer_size=1000000, batch_size=64, detail_summary=False, tanh_action=True, batch_norm=True):
+               buffer_size=1000000, batch_size=64, detail_summary=False, tanh_action=True, input_batch_norm=True,
+               all_batch_norm=True, log_frequency=10):
 
     self.state_dim = state_dim
     self.action_dim = action_dim
@@ -32,7 +33,9 @@ class DDPG:
     self.summary_dir = os.path.join(monitor_directory, "summary")
     self.detail_summary = detail_summary
     self.tanh_action = tanh_action
-    self.batch_norm = batch_norm
+    self.input_batch_norm = input_batch_norm
+    self.all_batch_norm = all_batch_norm
+    self.log_frequency = log_frequency
 
     self.step = 0
     self.solved = False
@@ -66,16 +69,19 @@ class DDPG:
   """
 
   def learn(self):
+
     batch = self.buffer.sample(self.batch_size)
     self.__train_critic(batch["states"], batch["actions"], batch["rewards"], batch["next_states"], batch["done"])
     self.__train_actor(batch["states"])
+
     self.session.run([self.target_critic_update, self.target_actor_update, self.inc_global_step])
 
   def act(self, state):
-    return self.session.run(self.action, feed_dict={
+    a =  self.session.run(self.action, feed_dict={
       self.state_input: state,
       self.is_training: False
     })[0]
+    return a
 
   def perceive(self, transition):
     self.buffer.add(transition)
@@ -116,12 +122,14 @@ class DDPG:
       b3 = tf.Variable(tf.random_uniform((1,), -3e-3, 3e-3), name="b3")
 
       # layers
-      if self.batch_norm:
+      if self.input_batch_norm:
         state_input = tf.layers.batch_normalization(state_input, training=bn_training)
 
       layer_1 = tf.matmul(state_input, W1) + b1
-      #if self.batch_norm:
-      #  layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+
+      if self.all_batch_norm:
+        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+
       layer_1 = tf.nn.relu(layer_1)
 
       layer_2 = tf.nn.relu(tf.matmul(layer_1, W2) + tf.matmul(action_input, W2_action) + b2)
@@ -129,21 +137,21 @@ class DDPG:
       output_layer = tf.matmul(layer_2, W3) + b3
 
       # summary
-      if self.detail_summary and name == self.CRITIC_NAME:
+      if name == self.CRITIC_NAME:
         self.critic_summaries = [
-          architect.variable_summaries(W1, "W1"),
-          architect.variable_summaries(b1, "b1"),
+          tf.summary.histogram("W1", W1),
+          tf.summary.histogram("b1", b1),
 
-          architect.variable_summaries(W2, "W2"),
-          architect.variable_summaries(b2, "b2"),
-          architect.variable_summaries(W2_action, "W2_action"),
+          tf.summary.histogram("W2", W2),
+          tf.summary.histogram("b2", b2),
+          tf.summary.histogram("W2_action", W2_action),
 
-          architect.variable_summaries(W3, "W3"),
-          architect.variable_summaries(b3, "b3"),
+          tf.summary.histogram("W3", W3),
+          tf.summary.histogram("b3", b3),
 
-          architect.variable_summaries(layer_1, "layer_1"),
-          architect.variable_summaries(layer_2, "layer_2"),
-          architect.variable_summaries(output_layer, "output_layer")
+          tf.summary.histogram("layer_1", layer_1),
+          tf.summary.histogram("layer_2", layer_2),
+          tf.summary.histogram("output_layer", output_layer)
         ]
 
       # weight decay
@@ -167,40 +175,44 @@ class DDPG:
       W2 = self.__get_weights((400, 300), 400, name="W2")
       b2 = self.__get_weights((300,), 400, name="b2")
 
-      W3 = tf.Variable(tf.random_uniform((300, self.action_dim), -3e-3, 3e-3), name="W3")
+      W3 = tf.Variable(tf.random_uniform((300, self.action_dim), minval=-3e-3, maxval=3e-3), name="W3")
       b3 = tf.Variable(tf.random_uniform((self.action_dim,), -3e-3, 3e-3), name="b3")
 
       # layers
-      if self.batch_norm:
+      if self.input_batch_norm:
         state_input = tf.layers.batch_normalization(state_input, training=bn_training)
 
       layer_1 = tf.matmul(state_input, W1) + b1
-      #if self.batch_norm:
-      #  layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+
+      if self.all_batch_norm:
+        layer_1 = tf.layers.batch_normalization(layer_1, training=bn_training)
+
       layer_1 = tf.nn.relu(layer_1)
 
       layer_2 = tf.matmul(layer_1, W2) + b2
-      #if self.batch_norm:
-      #  layer_2 = tf.layers.batch_normalization(layer_2, training=bn_training)
+
+      if self.all_batch_norm:
+        layer_2 = tf.layers.batch_normalization(layer_2, training=bn_training)
+
       layer_2 = tf.nn.relu(layer_2)
 
       output_layer = tf.matmul(layer_2, W3) + b3
 
       # summary
-      if self.detail_summary and name == self.ACTOR_NAME:
+      if name == self.ACTOR_NAME:
         self.actor_summaries = [
-          architect.variable_summaries(W1, "W1"),
-          architect.variable_summaries(b1, "b1"),
+          tf.summary.histogram("W1", W1),
+          tf.summary.histogram("b1", b1),
 
-          architect.variable_summaries(W2, "W2"),
-          architect.variable_summaries(b2, "b2"),
+          tf.summary.histogram("W2", W2),
+          tf.summary.histogram("b2", b2),
 
-          architect.variable_summaries(W3, "W3"),
-          architect.variable_summaries(b3, "b3"),
+          tf.summary.histogram("W3", W3),
+          tf.summary.histogram("b3", b3),
 
-          architect.variable_summaries(layer_1, "layer_1"),
-          architect.variable_summaries(layer_2, "layer_2"),
-          architect.variable_summaries(output_layer, "output_layer")
+          tf.summary.histogram("layer_1", layer_1),
+          tf.summary.histogram("layer_2", layer_2),
+          tf.summary.histogram("output_layer", output_layer)
         ]
 
       if self.tanh_action:
@@ -219,12 +231,12 @@ class DDPG:
 
     # inputs summary
     if self.detail_summary:
-      self.inputs_summaries = [
-        architect.variable_summaries(self.state_input),
-        architect.variable_summaries(self.next_state_input),
-        architect.variable_summaries(self.action_input),
-        architect.variable_summaries(self.reward_input),
-        architect.variable_summaries(self.done_input)
+      self.input_summaries = [
+        tf.summary.histogram("state", self.state_input),
+        tf.summary.histogram("next_state", self.next_state_input),
+        tf.summary.histogram("action", self.action_input),
+        tf.summary.histogram("reward", self.reward_input),
+        tf.summary.histogram("done", self.done_input)
       ]
 
     self.target_action = self.__build_actor(self.TARGET_ACTOR_NAME, self.next_state_input)
@@ -237,13 +249,16 @@ class DDPG:
     self.targets = tf.expand_dims(self.reward_input, 1) + self.discount * (1 - tf.expand_dims(self.done_input, 1)) * self.target_q_value
     self.diff = self.targets - self.q_value
 
-    if self.detail_summary:
-      architect.variable_summaries(self.diff, name="diff")
-
     self.loss = tf.reduce_mean(tf.square(tf.stop_gradient(self.targets) - self.q_value)) + weight_decay
     self.loss_summary = tf.summary.scalar("critic_loss", self.loss)
 
     self.critic_train_op = tf.train.AdamOptimizer(self.critic_learning_rate).minimize(self.loss)
+
+    # add critic batch norm. update
+    if self.input_batch_norm or self.all_batch_norm:
+      self.critic_bn_update_op = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=self.CRITIC_NAME)
+      self.critic_bn_update_op = tf.group(*self.critic_bn_update_op)
+      self.critic_train_op = tf.group(self.critic_train_op, self.critic_bn_update_op)
 
     self.action = self.__build_actor(self.ACTOR_NAME, self.state_input)
     self.actor_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.ACTOR_NAME)
@@ -252,17 +267,30 @@ class DDPG:
 
     # actor gradients summary
     if self.detail_summary:
-      self.actor_summaries.append(architect.variable_summaries(self.action_gradients, name="action_gradient"))
+      self.actor_summaries.append(tf.summary.histogram("action_gradient", self.action_gradients))
       for grad in self.actor_params_gradient:
-        self.actor_summaries.append(architect.variable_summaries(grad, name="actor_parameter_gradients"))
+        self.actor_summaries.append(tf.summary.histogram("actor_parameter_gradients", grad))
 
     self.actor_train_op = tf.train.AdamOptimizer(self.actor_learning_rate).apply_gradients(zip(self.actor_params_gradient, self.actor_params))
+
+    # add actor batch norm. update
+    if self.input_batch_norm or self.all_batch_norm:
+      self.actor_bn_update_op = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=self.ACTOR_NAME)
+      self.actor_bn_update_op = tf.group(*self.actor_bn_update_op)
+      self.actor_train_op = tf.group(self.actor_train_op, self.actor_bn_update_op)
 
     self.target_critic_update = architect.create_target_update_ops(self.CRITIC_NAME, self.TARGET_CRITIC_NAME, self.critic_target_update_rate)
     self.target_actor_update = architect.create_target_update_ops(self.ACTOR_NAME, self.TARGET_ACTOR_NAME, self.actor_target_update_rate)
 
     self.global_step = tf.Variable(0, name='global_step', trainable=False)
     self.inc_global_step = tf.assign(self.global_step, tf.add(self.global_step, 1))
+
+    # group summaries
+    self.critic_summaries = tf.summary.merge(self.critic_summaries)
+
+    if self.detail_summary:
+      self.actor_summaries = tf.summary.merge(self.actor_summaries)
+      self.input_summaries = tf.summary.merge(self.input_summaries)
 
   @staticmethod
   def __get_weights(shape, input_shape, name="var"):
@@ -272,7 +300,7 @@ class DDPG:
 
     actions = self.session.run(self.action, feed_dict={
       self.state_input: states,
-      self.is_training: False
+      self.is_training: True
     })
 
     self.session.run(self.actor_train_op, feed_dict={
@@ -282,13 +310,30 @@ class DDPG:
     })
 
   def __train_critic(self, states, actions, rewards, next_states, done):
-    _, targets, summary, tmp = self.session.run([self.critic_train_op, self.targets, self.merged, self.diff], feed_dict={
+    feed_dict = {
       self.state_input: states,
       self.action_input: actions,
       self.reward_input: rewards,
       self.next_state_input: next_states,
       self.done_input: done,
       self.is_training: True
-    })
-    self.summary_writer.add_summary(summary, global_step=self.session.run(self.global_step))
+    }
+    step = self.session.run(self.global_step)
 
+    if step % self.log_frequency == 0:
+
+      ops = [self.critic_train_op, self.loss_summary]
+
+      if self.detail_summary:
+        ops.append(self.actor_summaries)
+        ops.append(self.input_summaries)
+
+      res = self.session.run(ops, feed_dict=feed_dict)
+
+      self.summary_writer.add_summary(res[1], global_step=step)
+
+      if self.detail_summary:
+        self.summary_writer.add_summary(res[2], global_step=step)
+        self.summary_writer.add_summary(res[3], global_step=step)
+    else:
+      self.session.run(self.critic_train_op, feed_dict=feed_dict)
